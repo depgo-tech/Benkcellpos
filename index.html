@@ -1544,7 +1544,6 @@ async function processCheckout() {
     const total = Math.max(0, subtotal - diskonRp - (calc.ttNilai || 0));
     
     // FIX: Hanya insert kolom yang ADA di tabel transaksi
-    // items harus di-stringify karena kolom tipe TEXT
     const trxData = {
       id: idTrx,
       pelanggan: pel,
@@ -1553,7 +1552,6 @@ async function processCheckout() {
       metode: metode
     };
     
-    // Coba insert dengan kolom minimal dulu
     const { data: insertResult, error: insertError } = await supabaseClient.from('transaksi').insert([trxData]).select();
     
     if (insertError) {
