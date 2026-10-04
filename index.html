@@ -732,11 +732,11 @@ async function loadDashboard() {
     const { data: prods, error: prodError } = await supabaseClient.from('produk').select('*');
     if (trxError || prodError) throw trxError || prodError;
     const trxPeriode = (trx || []).filter(t => {
-      if (!t.tgl) return false;
-      const tgl = String(t.tgl).split('T')[0];
-      if (!startDate || !endDate) return true;
-      return tgl >= startDate && tgl <= endDate;
-    });
+  if (!t.tgl) return false;
+  const tgl = String(t.tgl).split('T')[0];
+  if (!startDate || !endDate) return true;
+  return tgl >= startDate && tgl <= endDate;
+});
     const penjualanPeriode = trxPeriode.reduce((s, t) => s + (Number(t.total) || 0), 0);
     const hppPeriode = 0;
     const labaPeriode = penjualanPeriode - hppPeriode;
@@ -748,7 +748,10 @@ async function loadDashboard() {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      const dayTotal = trxPeriode.filter(t => String(t.tgl).split('T')[0] === dateStr).reduce((s, t) => s + (Number(t.total) || 0), 0);
+      const dayTotal = trxPeriode.filter(t => {
+  if (!t.tgl) return false;
+  return String(t.tgl).split('T')[0] === dateStr;
+}).reduce((s, t) => s + (Number(t.total) || 0), 0);
       chartLabels.push(d.toLocaleDateString('id-ID', { weekday: 'short' }));
       chartData.push(dayTotal);
     }
