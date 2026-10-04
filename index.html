@@ -4,8 +4,8 @@
 <base target="_top">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <link id="favicon" rel="icon" href="https://z-cdn-media.chatglm.cn/files/dc6c73f6-138a-412e-a264-31156515be3c.png?auth_key=1884567107-72bf1055260449dc8458f2ae15aa7234-0-4942ebeed415e86d99ac303657546dae">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
 <style>
 :root { --sidebar-bg: #000000; --main-bg: #f4f6f9; --card-bg: #ffffff; --text-dark: #111111; --text-gray: #666666; --border-color: #e0e0e0; --danger: #dc3545; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; }
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
@@ -200,24 +200,7 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 <div id="ttSummary" class="hidden"></div>
 <div class="pay-row"><span>Pilih Garansi</span><select id="masaGaransi" aria-label="Pilih Masa Garansi"><option value="0">Tidak Bergaransi</option><option value="1">1 Bulan (Toko)</option><option value="3">3 Bulan (Toko)</option><option value="6">6 Bulan (Toko)</option><option value="12">12 Bulan (Distributor)</option><option value="24">24 Bulan (Ibox)</option></select></div>
 <div class="pay-row"><span>Metode Bayar</span><select id="metodeBayar" aria-label="Pilih Metode Pembayaran" onchange="toggleCicilanInput()">
-<option value="Cash">Cash</option>
-<option value="QRIS">QRIS</option>
-<option value="Transfer BCA">Transfer BCA</option>
-<option value="Transfer Mandiri">Transfer Mandiri</option>
-<option value="Transfer BRI">Transfer BRI</option>
-<option value="Transfer BNI">Transfer BNI</option>
-<option value="Transfer CIMB Niaga">Transfer CIMB Niaga</option>
-<option value="Transfer Permata">Transfer Permata</option>
-<option value="Transfer BSI">Transfer BSI</option>
-<option value="Transfer Danamon">Transfer Danamon</option>
-<option value="Transfer BTN">Transfer BTN</option>
-<option value="Transfer OCBC">Transfer OCBC</option>
-<option value="GoPay">GoPay</option>
-<option value="DANA">DANA</option>
-<option value="OVO">OVO</option>
-<option value="ShopeePay">ShopeePay</option>
-<option value="LinkAja">LinkAja</option>
-<option value="Cicilan">Cicilan</option>
+<option value="Cash">Cash</option><option value="QRIS">QRIS</option><option value="Transfer BCA">Transfer BCA</option><option value="Transfer Mandiri">Transfer Mandiri</option><option value="Transfer BRI">Transfer BRI</option><option value="Transfer BNI">Transfer BNI</option><option value="Transfer CIMB Niaga">Transfer CIMB Niaga</option><option value="Transfer Permata">Transfer Permata</option><option value="Transfer BSI">Transfer BSI</option><option value="Transfer Danamon">Transfer Danamon</option><option value="Transfer BTN">Transfer BTN</option><option value="Transfer OCBC">Transfer OCBC</option><option value="GoPay">GoPay</option><option value="DANA">DANA</option><option value="OVO">OVO</option><option value="ShopeePay">ShopeePay</option><option value="LinkAja">LinkAja</option><option value="Cicilan">Cicilan</option>
 </select></div>
 <div class="pay-row hidden" id="cicilanArea"><input type="text" id="namaCicilan" placeholder="Nama Cicilan (cth: Kredivo, Akulaku)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;"></div>
 <div class="pay-row"><span>Split Payment?</span><input type="checkbox" id="useSplitPayment" onchange="toggleSplitPayment()"></div>
@@ -517,26 +500,13 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 <div class="toast-container" id="toastContainer"></div>
 <script>
 // ============ SUPABASE CONFIG ============
-// GANTI URL DAN KEY INI DENGAN MILIK KAMU!
 const SUPABASE_URL = 'https://xlpmgyygaqyxlkmyqtoz.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhscG1neXlnYXF5eGxrbXlxdG96Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDU2MTI4NCwiZXhwIjoyMTAwMTM3Mjg0fQ.wYxoqQaBDxRd-_n4eFjNV1SBKKfo_MZbIa9KRD9_QFU';
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    
-// Inisialisasi Supabase client dengan aman
-let supabaseClient = null;
-try {
-  if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else if (typeof supabase !== 'undefined' && supabase.createClient) {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } else {
-    console.error('Supabase library belum ter-load!');
-  }
-} catch(e) {
-  console.error('Error init Supabase:', e);
-}
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhscG1neXlnYXF5eGxrbXlxdG96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NjEyODQsImV4cCI6MjEwMDEzNzI4NH0.2oKFfFaqmYu2-xvTwm4qNVcH1d4xp2-kCPaEVSWfuxE';
 
-// Helper: Safe parse JSON (handle string JSON dari Supabase)
+// FIX #1: Gunakan nama 'db' bukan 'supabase' untuk hindari bentrok dengan library global
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// FIX #2: Helper untuk safe parse JSON (handle string JSON dari Supabase)
 function safeParseJSON(data) {
   if (data === null || data === undefined) return [];
   if (Array.isArray(data)) return data;
@@ -546,7 +516,7 @@ function safeParseJSON(data) {
   return [];
 }
 
-// Helper: Get tanggal WIB
+// FIX #3: Helper tanggal WIB yang aman
 function wibToday() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
 }
@@ -583,11 +553,6 @@ window.addEventListener('load', function() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('app').classList.add('hidden');
   
-  if (!supabaseClient) {
-    showToast('Supabase belum siap. Refresh halaman.', true);
-    return;
-  }
-  
   loadPengaturan().then(function(d) {
     if(d && d[4]) { document.getElementById('loginLogo').src = d[4]; document.getElementById('favicon').href = d[4]; }
   }).catch(function(){ });
@@ -609,7 +574,7 @@ function togglePassVisibility() {
 
 async function loadLoginUsernameOptions() {
   try {
-    const { data, error } = await supabaseClient.from('users').select('username, full_name');
+    const { data, error } = await db.from('users').select('username, full_name');
     if (error) throw error;
     let sel = document.getElementById('loginUsername');
     if (!data || data.length === 0) { sel.innerHTML = '<option value="">Belum ada user terdaftar</option>'; return; }
@@ -627,7 +592,7 @@ async function doLogin() {
   if (!u || !p) { err.innerText = 'Username dan password wajib diisi'; err.style.display = 'block'; return; }
   btn.innerText = 'Loading...'; btn.disabled = true;
   try {
-    const { data, error } = await supabaseClient.from('users').select('*').eq('username', u).eq('password', p).single();
+    const { data, error } = await db.from('users').select('*').eq('username', u).eq('password', p).single();
     btn.innerText = 'Login'; btn.disabled = false;
     if (data && !error) { currentUser = data; document.getElementById('loginPassword').value = ''; showApp(); }
     else { err.innerText = 'Username atau password salah!'; err.style.display = 'block'; }
@@ -653,7 +618,7 @@ async function initApp() {
 
 async function refreshProdukFromServer(callback) {
   try {
-    const { data, error } = await supabaseClient.from('produk').select('*');
+    const { data, error } = await db.from('produk').select('*');
     if (error) throw error;
     allProduk = (data || []).map(p => [p.id, p.nama, p.varian, p.storage, p.harga, p.stok, p.kategori, p.foto, safeParseJSON(p.imei_list), p.is_konsinyasi, p.mitra_id, p.harga_setoran, p.hpp]);
     kategoriList = ['Semua'];
@@ -721,6 +686,7 @@ document.addEventListener('keydown', function (e) {
 
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); document.getElementById('sidebarOverlay').classList.toggle('active'); }
 
+// FIX #4: loadDashboard dengan null-safe filter
 async function loadDashboard() {
   let hour = new Date().getHours(); let greeting = "Selamat Malam";
   if (hour >= 4 && hour < 11) greeting = "Selamat Pagi"; else if (hour >= 11 && hour < 15) greeting = "Selamat Siang"; else if (hour >= 15 && hour < 18) greeting = "Selamat Sore";
@@ -728,15 +694,15 @@ async function loadDashboard() {
   let startDate = document.getElementById('dashDateStart').value;
   let endDate = document.getElementById('dashDateEnd').value;
   try {
-    const { data: trx, error: trxError } = await supabaseClient.from('transaksi').select('*');
-    const { data: prods, error: prodError } = await supabaseClient.from('produk').select('*');
+    const { data: trx, error: trxError } = await db.from('transaksi').select('*');
+    const { data: prods, error: prodError } = await db.from('produk').select('*');
     if (trxError || prodError) throw trxError || prodError;
     const trxPeriode = (trx || []).filter(t => {
-  if (!t.tgl) return false;
-  const tgl = String(t.tgl).split('T')[0];
-  if (!startDate || !endDate) return true;
-  return tgl >= startDate && tgl <= endDate;
-});
+      if (!t.tgl) return false;
+      const tgl = String(t.tgl).split('T')[0];
+      if (!startDate || !endDate) return true;
+      return tgl >= startDate && tgl <= endDate;
+    });
     const penjualanPeriode = trxPeriode.reduce((s, t) => s + (Number(t.total) || 0), 0);
     const hppPeriode = 0;
     const labaPeriode = penjualanPeriode - hppPeriode;
@@ -749,9 +715,9 @@ async function loadDashboard() {
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const dayTotal = trxPeriode.filter(t => {
-  if (!t.tgl) return false;
-  return String(t.tgl).split('T')[0] === dateStr;
-}).reduce((s, t) => s + (Number(t.total) || 0), 0);
+        if (!t.tgl) return false;
+        return String(t.tgl).split('T')[0] === dateStr;
+      }).reduce((s, t) => s + (Number(t.total) || 0), 0);
       chartLabels.push(d.toLocaleDateString('id-ID', { weekday: 'short' }));
       chartData.push(dayTotal);
     }
@@ -774,13 +740,14 @@ async function loadDashboard() {
 
 function resetDashFilterToday() { let todayStr = wibToday(); document.getElementById('dashDateStart').value = todayStr; document.getElementById('dashDateEnd').value = todayStr; loadDashboard(); }
 
+// FIX #5: loadRiwayat dengan safeParseJSON untuk items
 async function loadRiwayat() {
   let startDate = document.getElementById('riwayatDateStart').value;
   let endDate = document.getElementById('riwayatDateEnd').value;
   let t = document.getElementById('riwayatTrxTable');
   t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Memuat riwayat...</td></tr>';
   try {
-    const { data, error } = await supabaseClient.from('transaksi').select('*').order('tgl', { ascending: false });
+    const { data, error } = await db.from('transaksi').select('*').order('tgl', { ascending: false });
     if (error) throw error;
     const filtered = (data || []).filter(trx => {
       if (!trx.tgl) return false;
@@ -821,6 +788,7 @@ function parseMetodeStruk(metodeStr, fallbackTotal) {
   });
 }
 
+// FIX #6: buildStrukHtml dengan safeParseJSON untuk items
 function buildStrukHtml(trx) {
   let logo = currentSettings[5] || currentSettings[4] || '';
   let footerText = currentSettings[3] || 'Terima kasih telah berbelanja!';
@@ -836,7 +804,6 @@ function buildStrukHtml(trx) {
   strukHtml += '<div style="display:flex; justify-content:space-between;"><span>Pelanggan</span><span>' + esc(trx.pelanggan || 'Umum') + '</span></div>';
   strukHtml += '</div><div class="struk-divider"></div>';
   
-  // FIX: Safe parse items
   let itemsArr = safeParseJSON(trx.items);
   itemsArr.forEach(function (it) {
     if (typeof it === 'object') {
@@ -871,13 +838,15 @@ function buildStrukHtml(trx) {
   return strukHtml;
 }
 
+// FIX #7: cetakUlangStruk dengan safeParseJSON dan nama kolom garansi yang benar
 async function cetakUlangStruk(idx) {
   let r = allRiwayatData[idx];
   if (!r) return;
   if (allGaransiData.length === 0) await loadGaransi();
   let garansiBulan = 0;
-  let g = allGaransiData.find(function (x) { return x.invoice === r.id; });
-  if (g) garansiBulan = g.masa_garansi;
+  // FIX: gunakan no_invoice bukan invoice
+  let g = allGaransiData.find(function (x) { return x.no_invoice === r.id; });
+  if (g) garansiBulan = g.masa_garansi || 0;
   let itemsDetail = safeParseJSON(r.items);
   let subtotal = null, diskonRp = null;
   if (itemsDetail && itemsDetail.length > 0) {
@@ -894,11 +863,12 @@ async function cetakUlangStruk(idx) {
   document.getElementById('modalStruk').style.display = 'flex';
 }
 
+// FIX #8: cetakLaporanHarian dengan null-safe filter
 async function cetakLaporanHarian() {
   let startDate = document.getElementById('riwayatDateStart').value;
   let endDate = document.getElementById('riwayatDateEnd').value;
   try {
-    const { data: trx, error } = await supabaseClient.from('transaksi').select('*');
+    const { data: trx, error } = await db.from('transaksi').select('*');
     if (error) throw error;
     const filtered = (trx || []).filter(t => {
       if (!t.tgl) return false;
@@ -933,30 +903,31 @@ async function loadGaransi() {
   let t = document.getElementById('garansiTable');
   t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Memuat data garansi...</td></tr>';
   try {
-    const { data, error } = await supabaseClient.from('garansi').select('*');
+    const { data, error } = await db.from('garansi').select('*');
     if (error) throw error;
     allGaransiData = data || [];
     renderGaransiTable();
   } catch(err) { allGaransiData = []; t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">Error: ' + esc(err.message) + '</td></tr>'; }
 }
 
+// FIX #9: renderGaransiTable dengan nama kolom yang benar (no_invoice, nama_produk, masa_garansi)
 function renderGaransiTable() {
   let t = document.getElementById('garansiTable');
   let searchTerm = (document.getElementById('searchGaransi').value || '').toLowerCase();
   let filtered = allGaransiData.filter(function(r) {
-    return String(r.invoice).toLowerCase().includes(searchTerm) ||
-    String(r.imei).toLowerCase().includes(searchTerm) ||
-    String(r.produk).toLowerCase().includes(searchTerm) ||
-    String(r.pelanggan).toLowerCase().includes(searchTerm);
+    return String(r.no_invoice || '').toLowerCase().includes(searchTerm) ||
+    String(r.imei || '').toLowerCase().includes(searchTerm) ||
+    String(r.nama_produk || '').toLowerCase().includes(searchTerm) ||
+    String(r.pelanggan || '').toLowerCase().includes(searchTerm);
   });
   if (filtered.length === 0) { t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Data tidak ditemukan</td></tr>'; return; }
   let html = '';
   filtered.forEach(function (r) {
     let dateStr = new Date(r.tgl).toLocaleDateString('id-ID');
-    let expStr = new Date(r.exp).toLocaleDateString('id-ID');
-    let isExp = new Date(r.exp) < new Date();
-    let masaTxt = r.masa_garansi > 0 ? r.masa_garansi + ' Bulan' : 'Tidak Bergaransi';
-    html += '<tr style="border-bottom:1px solid #f5f5f5;"><td style="padding:12px; font-weight:500;">' + esc(r.invoice) + '</td><td style="padding:12px; color:var(--text-gray);">' + esc(dateStr) + '</td><td style="padding:12px;">' + esc(r.pelanggan) + '</td><td style="padding:12px; font-size:12px;">' + esc(r.produk) + '</td><td style="padding:12px; font-size:12px;">' + esc(r.imei) + '</td><td style="padding:12px;">' + esc(masaTxt) + '</td><td style="padding:12px; color:' + (isExp ? 'red' : 'green') + '; font-weight:600;">' + esc(expStr) + '</td></tr>';
+    let masaTxt = (r.masa_garansi && r.masa_garansi > 0) ? r.masa_garansi + ' Bulan' : 'Tidak Bergaransi';
+    let expStr = r.exp ? new Date(r.exp).toLocaleDateString('id-ID') : '-';
+    let isExp = r.exp ? new Date(r.exp) < new Date() : false;
+    html += '<tr style="border-bottom:1px solid #f5f5f5;"><td style="padding:12px; font-weight:500;">' + esc(r.no_invoice) + '</td><td style="padding:12px; color:var(--text-gray);">' + esc(dateStr) + '</td><td style="padding:12px;">' + esc(r.pelanggan || '-') + '</td><td style="padding:12px; font-size:12px;">' + esc(r.nama_produk) + '</td><td style="padding:12px; font-size:12px;">' + esc(r.imei || '-') + '</td><td style="padding:12px;">' + esc(masaTxt) + '</td><td style="padding:12px; color:' + (isExp ? 'red' : 'green') + '; font-weight:600;">' + esc(expStr) + '</td></tr>';
   });
   t.innerHTML = html;
 }
@@ -965,7 +936,7 @@ async function loadStokLog() {
   let t = document.getElementById('tableStokLog');
   t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Memuat riwayat stok...</td></tr>';
   try {
-    const { data, error } = await supabaseClient.from('stok_log').select('*').order('tgl', { ascending: false }).limit(100);
+    const { data, error } = await db.from('stok_log').select('*').order('tgl', { ascending: false }).limit(100);
     if (error) throw error;
     if (!data || data.length === 0) { t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Belum ada riwayat pergerakan stok</td></tr>'; return; }
     let html = '';
@@ -1018,15 +989,15 @@ async function submitStok() {
   btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Memproses...';
   try {
     if (modalStokContext === 'masuk') {
-      const { data: existing } = await supabaseClient.from('produk').select('stok').eq('id', produkId).single();
+      const { data: existing } = await db.from('produk').select('stok').eq('id', produkId).single();
       const newStok = (existing?.stok || 0) + payload.jumlah;
-      await supabaseClient.from('produk').update({ stok: newStok }).eq('id', produkId);
-      await supabaseClient.from('stok_log').insert([{ id: 'STK' + Date.now(), produk_id: produkId, produk_nama: payload.produkNama, tipe: 'masuk', jumlah: payload.jumlah, stok_sistem: newStok, stok_fisik: payload.jumlah, keterangan: payload.keterangan }]);
+      await db.from('produk').update({ stok: newStok }).eq('id', produkId);
+      await db.from('stok_log').insert([{ id: 'STK' + Date.now(), produk_id: produkId, produk_nama: payload.produkNama, tipe: 'masuk', jumlah: payload.jumlah, stok_sistem: newStok, stok_fisik: payload.jumlah, keterangan: payload.keterangan }]);
     } else {
-      const { data: existing } = await supabaseClient.from('produk').select('stok').eq('id', produkId).single();
+      const { data: existing } = await db.from('produk').select('stok').eq('id', produkId).single();
       const newStok = Math.max(0, (existing?.stok || 0) - payload.jumlah);
-      await supabaseClient.from('produk').update({ stok: newStok }).eq('id', produkId);
-      await supabaseClient.from('stok_log').insert([{ id: 'STK' + Date.now(), produk_id: produkId, produk_nama: payload.produkNama, tipe: 'keluar', jumlah: -payload.jumlah, stok_sistem: newStok, stok_fisik: 0, keterangan: payload.keterangan }]);
+      await db.from('produk').update({ stok: newStok }).eq('id', produkId);
+      await db.from('stok_log').insert([{ id: 'STK' + Date.now(), produk_id: produkId, produk_nama: payload.produkNama, tipe: 'keluar', jumlah: -payload.jumlah, stok_sistem: newStok, stok_fisik: 0, keterangan: payload.keterangan }]);
     }
     showToast('Stok berhasil diupdate!');
     closeModal('modalStok');
@@ -1059,8 +1030,8 @@ async function submitOpname() {
     for (const item of items) {
       const selisih = item.stokFisik - item.stokSistem;
       if (selisih !== 0) {
-        await supabaseClient.from('produk').update({ stok: item.stokFisik }).eq('id', item.id);
-        await supabaseClient.from('stok_log').insert([{ id: 'OPN' + Date.now() + Math.random().toString(36).substr(2, 5), produk_id: item.id, produk_nama: item.nama, tipe: 'opname', jumlah: selisih, stok_sistem: item.stokSistem, stok_fisik: item.stokFisik, keterangan: 'Stock Opname' }]);
+        await db.from('produk').update({ stok: item.stokFisik }).eq('id', item.id);
+        await db.from('stok_log').insert([{ id: 'OPN' + Date.now() + Math.random().toString(36).substr(2, 5), produk_id: item.id, produk_nama: item.nama, tipe: 'opname', jumlah: selisih, stok_sistem: item.stokSistem, stok_fisik: item.stokFisik, keterangan: 'Stock Opname' }]);
       }
     }
     showToast('Stock Opname berhasil diproses!');
@@ -1073,7 +1044,7 @@ async function submitOpname() {
 
 async function loadKonsinyasi() {
   try {
-    const { data: mitraData, error: mitraError } = await supabaseClient.from('mitra').select('*');
+    const { data: mitraData, error: mitraError } = await db.from('mitra').select('*');
     if (mitraError) throw mitraError;
     allMitra = mitraData || [];
     let tbody = document.getElementById('tableMitra');
@@ -1087,7 +1058,7 @@ async function loadKonsinyasi() {
     if (allMitra.length === 0) { konsinyasiBox.style.display = 'none'; }
     else {
       konsinyasiBox.style.display = 'block';
-      const { data: konsData, error: konsError } = await supabaseClient.from('konsinyasi_keluar').select('*');
+      const { data: konsData, error: konsError } = await db.from('konsinyasi_keluar').select('*');
       if (konsError) throw konsError;
       let tbody = document.getElementById('tableKonsinyasiKeluar');
       if (!konsData || konsData.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Belum ada barang dititipkan keluar</td></tr>'; return; }
@@ -1108,7 +1079,7 @@ async function addMitra() {
   let t = document.getElementById('newMitraTelp').value.trim();
   if(!n) { showToast('Nama mitra wajib diisi', true); return; }
   try {
-    const { error } = await supabaseClient.from('mitra').insert([{ id: 'MTR' + Date.now(), nama: n, telp: t, hutang: 0, piutang: 0 }]);
+    const { error } = await db.from('mitra').insert([{ id: 'MTR' + Date.now(), nama: n, telp: t, hutang: 0, piutang: 0 }]);
     if (error) throw error;
     showToast('Mitra berhasil ditambahkan!');
     document.getElementById('newMitraNama').value = ''; document.getElementById('newMitraTelp').value = '';
@@ -1133,16 +1104,16 @@ async function submitModalFinansial() {
   btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Memproses...';
   try {
     if (modalFinContext.type === 'bayar_hutang') {
-      const { data: m } = await supabaseClient.from('mitra').select('hutang').eq('id', modalFinContext.id).single();
+      const { data: m } = await db.from('mitra').select('hutang').eq('id', modalFinContext.id).single();
       const newHutang = Math.max(0, (m?.hutang || 0) - jumlah);
-      await supabaseClient.from('mitra').update({ hutang: newHutang }).eq('id', modalFinContext.id);
+      await db.from('mitra').update({ hutang: newHutang }).eq('id', modalFinContext.id);
     } else {
-      const { data: k } = await supabaseClient.from('konsinyasi_keluar').select('*').eq('id', modalFinContext.id).single();
+      const { data: k } = await db.from('konsinyasi_keluar').select('*').eq('id', modalFinContext.id).single();
       const newTerbayar = (k?.terbayar || 0) + jumlah;
       const newTotal = k?.total || 0;
-      await supabaseClient.from('konsinyasi_keluar').update({ terbayar: newTerbayar, status: newTerbayar >= newTotal ? 'Lunas' : 'Belum Lunas' }).eq('id', modalFinContext.id);
-      const { data: m } = await supabaseClient.from('mitra').select('piutang').eq('id', k.mitra_id).single();
-      await supabaseClient.from('mitra').update({ piutang: Math.max(0, (m?.piutang || 0) - jumlah) }).eq('id', k.mitra_id);
+      await db.from('konsinyasi_keluar').update({ terbayar: newTerbayar, status: newTerbayar >= newTotal ? 'Lunas' : 'Belum Lunas' }).eq('id', modalFinContext.id);
+      const { data: m } = await db.from('mitra').select('piutang').eq('id', k.mitra_id).single();
+      await db.from('mitra').update({ piutang: Math.max(0, (m?.piutang || 0) - jumlah) }).eq('id', k.mitra_id);
     }
     showToast('Transaksi berhasil dicatat!');
     closeModal('modalFinansial');
@@ -1217,9 +1188,9 @@ async function simpanKonsinyasiKeluar() {
   let btn = document.getElementById('btnSaveKonsinyasi');
   btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Mengirim...';
   try {
-    await supabaseClient.from('konsinyasi_keluar').insert([{ id: 'KNS' + Date.now(), mitra_id: mitraId, mitra_nama: mitraNama, items: keranjangKonsinyasi, total: total, terbayar: 0, status: 'Belum Lunas' }]);
-    const { data: m } = await supabaseClient.from('mitra').select('piutang').eq('id', mitraId).single();
-    await supabaseClient.from('mitra').update({ piutang: (m?.piutang || 0) + total }).eq('id', mitraId);
+    await db.from('konsinyasi_keluar').insert([{ id: 'KNS' + Date.now(), mitra_id: mitraId, mitra_nama: mitraNama, items: keranjangKonsinyasi, total: total, terbayar: 0, status: 'Belum Lunas' }]);
+    const { data: m } = await db.from('mitra').select('piutang').eq('id', mitraId).single();
+    await db.from('mitra').update({ piutang: (m?.piutang || 0) + total }).eq('id', mitraId);
     showToast('Barang berhasil dikirim dan piutang dicatat!');
     closeModal('modalKonsinyasiKeluar');
     await refreshProdukFromServer();
@@ -1330,9 +1301,9 @@ async function saveProduk() {
   btn.innerText = 'Menyimpan...'; btn.disabled = true;
   if (!data.id) data.id = 'PRD' + new Date().getTime() + Math.floor(Math.random() * 1000);
   try {
-    const { data: existing } = await supabaseClient.from('produk').select('id').eq('id', data.id);
-    if (existing && existing.length > 0) { const { error } = await supabaseClient.from('produk').update(data).eq('id', data.id); if (error) throw error; }
-    else { data.stok = 0; data.imei_list = []; const { error } = await supabaseClient.from('produk').insert([data]); if (error) throw error; }
+    const { data: existing } = await db.from('produk').select('id').eq('id', data.id);
+    if (existing && existing.length > 0) { const { error } = await db.from('produk').update(data).eq('id', data.id); if (error) throw error; }
+    else { data.stok = 0; data.imei_list = []; const { error } = await db.from('produk').insert([data]); if (error) throw error; }
     showToast('Produk berhasil disimpan!');
     await refreshProdukFromServer();
     btn.innerText = 'Simpan Produk'; btn.disabled = false;
@@ -1484,6 +1455,8 @@ function openTukarTambahPopup() { document.getElementById('popTtNama').value = t
 function simpanTukarTambah() { let nilai = parseRupiah(document.getElementById('popTtNilai').value); if (nilai <= 0) { showToast('Nilai tukar wajib diisi!', true); return; } ttData = { nama: document.getElementById('popTtNama').value.trim(), imei: document.getElementById('popTtImei').value.trim(), nilai: nilai }; document.getElementById('useTukarTambah').checked = true; closeModal('modalTukarTambah'); renderTtSummary(); hitungTotal(); }
 function batalTukarTambah() { closeModal('modalTukarTambah'); if (!ttData.nilai) document.getElementById('useTukarTambah').checked = false; }
 function hapusTukarTambah() { ttData = { nama: '', imei: '', nilai: 0 }; document.getElementById('useTukarTambah').checked = false; renderTtSummary(); hitungTotal(); }
+
+// FIX #10: renderTtSummary tanpa emoji corrupt
 function renderTtSummary() {
   let el = document.getElementById('ttSummary');
   if (ttData.nilai > 0) { el.classList.remove('hidden'); el.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; background:#fff0f0; border:1px dashed #dc3545; border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:10px;"><span>' + esc(ttData.nama || 'Tukar Tambah') + ' <b>- Rp ' + ttData.nilai.toLocaleString('id-ID') + '</b></span><span><span style="cursor:pointer; font-weight:700; margin-right:10px;" onclick="openTukarTambahPopup()">Edit</span><span style="color:#dc3545; cursor:pointer; font-weight:700;" onclick="hapusTukarTambah()">Hapus</span></span></div>'; }
@@ -1496,6 +1469,7 @@ function addSplitPayment() { splitPayments.push({ metode: 'Cash', jumlah: 0, nam
 function removeSplitPayment(idx) { splitPayments.splice(idx, 1); renderSplitPayments(); hitungTotal(); }
 function updateSplitPayment(idx, field, value) { if (field === 'jumlah') value = parseRupiah(value); splitPayments[idx][field] = value; if (field === 'metode') renderSplitPayments(); hitungTotal(); }
 
+// FIX #11: renderSplitPayments tanpa emoji corrupt
 function renderSplitPayments() {
   let html = '';
   let bankOptionsHtml = '<option value="Cash">Cash</option><option value="QRIS">QRIS</option><option value="Transfer BCA">Transfer BCA</option><option value="Transfer Mandiri">Transfer Mandiri</option><option value="Transfer BRI">Transfer BRI</option><option value="Transfer BNI">Transfer BNI</option><option value="Transfer CIMB Niaga">Transfer CIMB Niaga</option><option value="Transfer Permata">Transfer Permata</option><option value="Transfer BSI">Transfer BSI</option><option value="Transfer Danamon">Transfer Danamon</option><option value="Transfer BTN">Transfer BTN</option><option value="Transfer OCBC">Transfer OCBC</option><option value="GoPay">GoPay</option><option value="DANA">DANA</option><option value="OVO">OVO</option><option value="ShopeePay">ShopeePay</option><option value="LinkAja">LinkAja</option><option value="Cicilan">Cicilan</option><option value="Tukar Tambah">Tukar Tambah</option>';
@@ -1514,6 +1488,7 @@ function renderSplitPayments() {
   hitungTotal();
 }
 
+// FIX #12: hitungTotal tanpa emoji corrupt
 function hitungTotal() {
   let s = keranjang.reduce(function (sum, i) { return sum + (i.harga * i.qty); }, 0);
   let dType = document.getElementById('diskonType').value;
@@ -1536,6 +1511,7 @@ function hitungTotal() {
   return { sub: s, diskonRp: diskonRp, total: total, diskonStr: dType === 'rp' ? dVal : dVal + '%', ttNama: ttData.nama, ttImei: ttData.imei, ttNilai: ttNilai, masaGaransi: document.getElementById('masaGaransi').value };
 }
 
+// FIX #13: processCheckout dengan safeParseJSON untuk imei_list
 async function processCheckout() {
   if (keranjang.length === 0 || isCheckingOut) return;
   isCheckingOut = true;
@@ -1566,14 +1542,14 @@ async function processCheckout() {
     const dVal = parseFloat(calc.diskonStr) || 0;
     const diskonRp = dType === '%' ? (subtotal * dVal / 100) : dVal;
     const total = Math.max(0, subtotal - diskonRp - (calc.ttNilai || 0));
-    await supabaseClient.from('transaksi').insert([{ id: idTrx, kasir: currentUser.full_name, pelanggan: pel, items: keranjangToSave, subtotal: subtotal, diskon_str: calc.diskonStr, diskon_rp: diskonRp, tt_nama: ttDariSplit > 0 ? ttNamaDariSplit : calc.ttNama, tt_imei: ttDariSplit > 0 ? '' : calc.ttImei, tt_nilai: (calc.ttNilai || 0) + ttDariSplit, total: total, metode: metode, rincian_bayar: splitPayData, masa_garansi: parseInt(calc.masaGaransi) || 0 }]);
+    await db.from('transaksi').insert([{ id: idTrx, kasir: currentUser.full_name, pelanggan: pel, items: keranjangToSave, subtotal: subtotal, diskon_str: calc.diskonStr, diskon_rp: diskonRp, tt_nama: ttDariSplit > 0 ? ttNamaDariSplit : calc.ttNama, tt_imei: ttDariSplit > 0 ? '' : calc.ttImei, tt_nilai: (calc.ttNilai || 0) + ttDariSplit, total: total, metode: metode, rincian_bayar: splitPayData, masa_garansi: parseInt(calc.masaGaransi) || 0 }]);
     for (const item of keranjangToSave) {
       if (item.imei) {
-        const { data: p } = await supabaseClient.from('produk').select('imei_list, stok').eq('id', item.id).single();
-        if (p) { const imeis = (safeParseJSON(p.imei_list)).filter(im => im.imei !== item.imei); await supabaseClient.from('produk').update({ imei_list: imeis, stok: imeis.length }).eq('id', item.id); }
+        const { data: p } = await db.from('produk').select('imei_list, stok').eq('id', item.id).single();
+        if (p) { const imeis = safeParseJSON(p.imei_list).filter(im => im.imei !== item.imei); await db.from('produk').update({ imei_list: imeis, stok: imeis.length }).eq('id', item.id); }
       } else {
-        const { data: p } = await supabaseClient.from('produk').select('stok').eq('id', item.id).single();
-        if (p) { await supabaseClient.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id); }
+        const { data: p } = await db.from('produk').select('stok').eq('id', item.id).single();
+        if (p) { await db.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id); }
       }
     }
     let rincianBayar = (splitPayData.length > 1) ? splitPayData : [{ metode: metode, jumlah: Number(total) }];
@@ -1608,7 +1584,7 @@ async function processCheckout() {
 
 async function loadUsers() {
   try {
-    const { data, error } = await supabaseClient.from('users').select('id, username, full_name, role');
+    const { data, error } = await db.from('users').select('id, username, full_name, role');
     if (error) throw error;
     let tbody = document.getElementById('tableUsers');
     let rows = data.map(function(u) {
@@ -1629,7 +1605,7 @@ async function submitModalPromptText() {
   let btn = document.getElementById('btnModalPromptText');
   btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Menyimpan...';
   try {
-    const { error } = await supabaseClient.from('users').update({ password: val }).eq('id', modalPromptTextContext.id);
+    const { error } = await db.from('users').update({ password: val }).eq('id', modalPromptTextContext.id);
     if (error) throw error;
     showToast('Password berhasil direset!');
     closeModal('modalPromptText');
@@ -1644,10 +1620,10 @@ async function addUser() {
   let r = document.getElementById('newUserRole').value;
   if(!u || !p || !n) { showToast('Semua kolom wajib diisi', true); return; }
   try {
-    const { data: existing, error: checkError } = await supabaseClient.from('users').select('id').eq('username', u);
+    const { data: existing, error: checkError } = await db.from('users').select('id').eq('username', u);
     if (checkError) throw checkError;
     if (existing && existing.length > 0) { showToast('Username sudah dipakai!', true); return; }
-    const { error } = await supabaseClient.from('users').insert([{ id: 'USR' + Date.now(), username: u, password: p, full_name: n, role: r }]);
+    const { error } = await db.from('users').insert([{ id: 'USR' + Date.now(), username: u, password: p, full_name: n, role: r }]);
     if (error) throw error;
     showToast('User berhasil ditambahkan!');
     document.getElementById('newUsername').value = ''; document.getElementById('newPassword').value = ''; document.getElementById('newFullName').value = '';
@@ -1660,17 +1636,17 @@ function confirmDelete(id, type) { targetDeleteId = id; targetDeleteType = type;
 async function executeDelete() {
   closeModal('modalConfirm'); if (!targetDeleteId) return;
   try {
-    if (targetDeleteType === 'produk') { const { error } = await supabaseClient.from('produk').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Produk dihapus!'); await refreshProdukFromServer(); loadTableProduk(); }
-    else if (targetDeleteType === 'user') { const { error } = await supabaseClient.from('users').delete().eq('id', targetDeleteId); if (error) throw error; showToast('User dihapus!'); await loadUsers(); }
-    else if (targetDeleteType === 'mitra') { const { error } = await supabaseClient.from('mitra').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Mitra dihapus!'); await loadKonsinyasi(); await refreshProdukFromServer(); }
-    else if (targetDeleteType === 'transaksi') { const { error } = await supabaseClient.from('transaksi').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Transaksi dihapus!'); await loadRiwayat(); await refreshProdukFromServer(); if (document.getElementById('view-dashboard').classList.contains('active')) await loadDashboard(); }
+    if (targetDeleteType === 'produk') { const { error } = await db.from('produk').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Produk dihapus!'); await refreshProdukFromServer(); loadTableProduk(); }
+    else if (targetDeleteType === 'user') { const { error } = await db.from('users').delete().eq('id', targetDeleteId); if (error) throw error; showToast('User dihapus!'); await loadUsers(); }
+    else if (targetDeleteType === 'mitra') { const { error } = await db.from('mitra').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Mitra dihapus!'); await loadKonsinyasi(); await refreshProdukFromServer(); }
+    else if (targetDeleteType === 'transaksi') { const { error } = await db.from('transaksi').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Transaksi dihapus!'); await loadRiwayat(); await refreshProdukFromServer(); if (document.getElementById('view-dashboard').classList.contains('active')) await loadDashboard(); }
   } catch(err) { showToast('Gagal menghapus: ' + (err && err.message ? err.message : ''), true); }
   targetDeleteId = null; targetDeleteType = '';
 }
 
 async function loadPengaturan() {
   try {
-    const { data, error } = await supabaseClient.from('pengaturan').select('*').eq('id', 1).single();
+    const { data, error } = await db.from('pengaturan').select('*').eq('id', 1).single();
     if (error) throw error;
     if (data) {
       currentSettings = [data.nama_toko, data.alamat, data.telp, data.footer, data.logo_toko, data.logo_struk];
@@ -1688,7 +1664,7 @@ async function savePengaturan() {
   if (logoTokoDihapus) data.logo_toko = ''; else if (!data.logo_toko && currentSettings[4]) data.logo_toko = currentSettings[4];
   if (logoStrukDihapus) data.logo_struk = ''; else if (!data.logo_struk && currentSettings[5]) data.logo_struk = currentSettings[5];
   try {
-    const { error } = await supabaseClient.from('pengaturan').update(data).eq('id', 1);
+    const { error } = await db.from('pengaturan').update(data).eq('id', 1);
     if (error) throw error;
     currentSettings = [data.nama_toko, data.alamat, data.telp, data.footer, data.logo_toko, data.logo_struk];
     if (data.logo_toko) { document.getElementById('sidebarLogo').src = data.logo_toko; document.getElementById('sidebarLogo').style.display = 'block'; document.getElementById('favicon').href = data.logo_toko; }
@@ -1741,7 +1717,7 @@ async function simpanHppMassal() {
   let btn = document.getElementById('btnSaveHpp');
   btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Menyimpan...';
   try {
-    for (const item of items) { const { error } = await supabaseClient.from('produk').update({ hpp: item.hpp }).eq('id', item.id); if (error) throw error; }
+    for (const item of items) { const { error } = await db.from('produk').update({ hpp: item.hpp }).eq('id', item.id); if (error) throw error; }
     showToast('HPP ' + items.length + ' produk berhasil disimpan!');
     closeModal('modalHpp');
     await refreshProdukFromServer();
@@ -1822,6 +1798,7 @@ function connectBlePrinter() {
   navigator.bluetooth.requestDevice({ filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] }).then(device => { device.addEventListener('gattserverdisconnected', function() { bleChar = null; let st = document.getElementById('bleStatus'); if (st) st.innerText = 'Status: TERPUTUS - sambungkan ulang'; showToast('Printer Bluetooth terputus!', true); }); return device.gatt.connect(); }).then(server => server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb')).then(service => service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb')).then(char => { bleChar = char; document.getElementById('bleStatus').innerText = 'Status: Terhubung ke Printer Thermal'; showToast('Printer Bluetooth berhasil dihubungkan!'); }).catch(err => { document.getElementById('bleStatus').innerText = 'Status: Gagal - ' + err.message; });
 }
 
+// FIX #14: testPrint dengan string literal yang benar
 function testPrint() { let encoder = new TextEncoder(); let data = encoder.encode('\x1B\x40\x1B\x61\x01Test Print Benk Cell\n\x1D\x56\x42\x00'); sendToPrinter(data).then(() => showToast('Test print berhasil dikirim!')).catch(err => showToast('Gagal test print: ' + err.message, true)); }
 
 function logoToEscPosRaster(dataUrl, targetWidth, maxHeight) {
@@ -1859,6 +1836,7 @@ function logoToEscPosRaster(dataUrl, targetWidth, maxHeight) {
 let printLock = false;
 function withTimeout(promise, ms) { return Promise.race([promise, new Promise(function (_, reject) { setTimeout(function () { reject(new Error('Timeout ' + (ms / 1000) + ' detik - printer tidak merespons')); }, ms); })]); }
 
+// FIX #15: buildStrukEscPosBytes dengan string literal yang benar
 async function buildStrukEscPosBytes(withLogo) {
   let strukArea = document.getElementById('strukArea');
   if (!strukArea) throw new Error('Struk tidak ditemukan');
