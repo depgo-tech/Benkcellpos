@@ -505,6 +505,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // FIX #1: Gunakan nama 'db' bukan 'supabase' untuk hindari bentrok dengan library global
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const supabaseClient = db;
 
 // FIX #2: Helper untuk safe parse JSON (handle string JSON dari Supabase)
 function safeParseJSON(data) {
