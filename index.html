@@ -747,7 +747,13 @@ if (!filtered || filtered.length === 0) { t.innerHTML = '<tr><td colspan="7" sty
 let html = '';
 filtered.forEach(function (r, idx) {
 let dateStr = new Date(r.tgl).toLocaleString('id-ID');
-let itemsTxt = (r.items || []).map(it => typeof it === 'object' ? it.nama : it).join(', ');
+let itemsTxt = '';
+try {
+  const itemsArr = (typeof r.items === 'string') ? JSON.parse(r.items) : (r.items || []);
+  itemsTxt = (Array.isArray(itemsArr) ? itemsArr : []).map(it => typeof it === 'object' ? it.nama : it).join(', ');
+} catch(e) {
+  itemsTxt = String(r.items || '');
+}
 html += '<tr style="border-bottom:1px solid #f5f5f5;"><td style="padding:12px; font-weight:500;">' + esc(r.id) + '</td><td style="padding:12px; color:var(--text-gray);">' + esc(dateStr) + '</td><td style="padding:12px;">' + esc(r.pelanggan) + '</td><td style="padding:12px; font-size:12px;">' + esc(itemsTxt) + '</td><td style="padding:12px; font-weight:600;">Rp ' + Number(r.total).toLocaleString('id-ID') + '</td><td style="padding:12px;">' + esc(r.metode) + '</td><td style="padding:12px; white-space:nowrap;"><button class="btn-action" onclick="cetakUlangStruk(' + idx + ')">Cetak</button><button class="btn-action danger" onclick="confirmDelete(\'' + esc(r.id) + '\', \'transaksi\')">Hapus</button></td></tr>';
 });
 t.innerHTML = html;
