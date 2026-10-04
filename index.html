@@ -1600,10 +1600,7 @@ function hitungTotal() {
   total: total,
   metode: metode
 };
-
-const { error: insertError } = await db.from('transaksi').insert([trxData]);
-
-    const { error: insertError } = await db.from('transaksi').insert([trxData]);
+ const { error: insertError } = await db.from('transaksi').insert([trxData]);
     if (insertError) throw new Error('Gagal simpan: ' + insertError.message);
 
     // Update stok
