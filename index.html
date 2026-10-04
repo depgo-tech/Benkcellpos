@@ -695,8 +695,8 @@ async function loadDashboard() {
   let startDate = document.getElementById('dashDateStart').value;
   let endDate = document.getElementById('dashDateEnd').value;
   try {
-    const { data: trx, error: trxError } = await db.from('transaksi').select('*');
-    const { data: prods, error: prodError } = await db.from('produk').select('*');
+    const { data: trx, error: trxError } = await supabaseClient.from('transaksi').select('*');
+    const { data: prods, error: prodError } = await supabaseClient.from('produk').select('*');
     if (trxError || prodError) throw trxError || prodError;
     const trxPeriode = (trx || []).filter(t => {
       if (!t.tgl) return false;
@@ -745,7 +745,7 @@ async function loadRiwayat() {
   let t = document.getElementById('riwayatTrxTable');
   t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Memuat riwayat...</td></tr>';
   try {
-    const { data, error } = await db.from('transaksi').select('*').order('tgl', { ascending: false });
+    const { data, error } = await supabaseClient.from('transaksi').select('*').order('tgl', { ascending: false });
     if (error) throw error;
     const filtered = (data || []).filter(trx => {
       if (!trx.tgl) return false;
@@ -764,6 +764,7 @@ async function loadRiwayat() {
     let html = '';
     filtered.forEach(function (r, idx) {
       let dateStr = new Date(r.tgl).toLocaleString('id-ID');
+      // Parse items yang bertipe TEXT (string JSON)
       let itemsArr = r.items;
       if (typeof itemsArr === 'string') { try { itemsArr = JSON.parse(itemsArr); } catch(e) { itemsArr = []; } }
       if (!Array.isArray(itemsArr)) itemsArr = [];
@@ -773,7 +774,7 @@ async function loadRiwayat() {
     t.innerHTML = html;
   } catch(err) { t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">Error memuat riwayat: ' + esc(err.message) + '</td></tr>'; }
 }
-
+  
 function formatTglWibStruk(iso) {
   return new Date(iso).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' }) + ', ' + new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
 }
@@ -1519,34 +1520,21 @@ async function processCheckout() {
   btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Memproses...';
   let pel = document.getElementById('namaPelanggan').value.trim() || 'Umum';
   let metode = document.getElementById('metodeBayar').value;
-  if (metode === 'Cicilan') {
-    let namaCicilan = document.getElementById('namaCicilan').value.trim();
-    if (namaCicilan) metode = 'Cicilan - ' + namaCicilan;
-  }
+  if (metode === 'Cicilan') { let namaCicilan = document.getElementById('namaCicilan').value.trim(); if (namaCicilan) metode = 'Cicilan - ' + namaCicilan; }
   let calc = hitungTotal();
   let keranjangToSave = JSON.parse(JSON.stringify(keranjang));
-  let splitPayData = [];
-  let ttDariSplit = 0;
-  let ttNamaDariSplit = '';
+  let splitPayData = []; let ttDariSplit = 0; let ttNamaDariSplit = '';
   if (document.getElementById('useSplitPayment').checked && splitPayments.length > 0) {
     let adaTtSplit = splitPayments.some(function (sp) { return sp.metode === 'Tukar Tambah' && sp.jumlah > 0; });
-    if (adaTtSplit && calc.ttNilai > 0) {
-      showToast('Tukar Tambah sudah diisi di Split Payment. Hilangkan centang "Pakai Tukar Tambah?" dulu!', true);
-      isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return;
-    }
+    if (adaTtSplit && calc.ttNilai > 0) { showToast('Tukar Tambah sudah diisi di Split Payment. Hilangkan centang "Pakai Tukar Tambah?" dulu!', true); isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return; }
     let totalSplit = splitPayments.reduce((sum, sp) => sum + sp.jumlah, 0);
-    if (totalSplit < calc.total) {
-      showToast('Total split payment kurang dari total belanja!', true);
-      isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return;
-    }
+    if (totalSplit < calc.total) { showToast('Total split payment kurang dari total belanja!', true); isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return; }
     splitPayData = splitPayments.map(function (sp) {
       if (sp.metode === 'Cicilan') { let nm = (sp.namaCicilan || '').trim(); return { metode: nm ? ('Cicilan - ' + nm) : 'Cicilan', jumlah: sp.jumlah }; }
       if (sp.metode === 'Tukar Tambah') { let nm = (sp.namaBarang || '').trim(); return { metode: nm ? ('Tukar Tambah - ' + nm) : 'Tukar Tambah', jumlah: sp.jumlah }; }
       return { metode: sp.metode, jumlah: sp.jumlah };
     });
-    if (splitPayments.length === 1 && splitPayments[0].metode === 'Tukar Tambah') {
-      ttDariSplit = splitPayments[0].jumlah; ttNamaDariSplit = (splitPayments[0].namaBarang || '').trim(); splitPayData = [];
-    }
+    if (splitPayments.length === 1 && splitPayments[0].metode === 'Tukar Tambah') { ttDariSplit = splitPayments[0].jumlah; ttNamaDariSplit = (splitPayments[0].namaBarang || '').trim(); splitPayData = []; }
   }
   try {
     const idTrx = 'INV' + Date.now();
@@ -1556,41 +1544,35 @@ async function processCheckout() {
     const diskonRp = dType === '%' ? (subtotal * dVal / 100) : dVal;
     const total = Math.max(0, subtotal - diskonRp - (calc.ttNilai || 0));
 
-    // ⚠️ HANYA INSERT KOLOM YANG ADA DI TABEL KAMU!
+    // HANYA insert kolom yang ADA di tabel transaksi kamu!
     const trxData = {
       id: idTrx,
       pelanggan: pel,
       items: JSON.stringify(keranjangToSave), // STRINGIFY karena kolom TEXT
       total: total,
       metode: metode
+      // tgl akan auto-fill dari default Supabase (now())
     };
 
-    const { error: insertError } = await db.from('transaksi').insert([trxData]);
+    const { error: insertError } = await supabaseClient.from('transaksi').insert([trxData]);
     if (insertError) throw new Error('Gagal simpan: ' + insertError.message);
 
     // Update stok
     for (const item of keranjangToSave) {
       if (item.imei) {
-        const { data: p } = await db.from('produk').select('imei_list, stok').eq('id', item.id).single();
+        const { data: p } = await supabaseClient.from('produk').select('imei_list, stok').eq('id', item.id).single();
         if (p) {
           const imeis = (Array.isArray(p.imei_list) ? p.imei_list : []).filter(im => im.imei !== item.imei);
-          await db.from('produk').update({ imei_list: JSON.stringify(imeis), stok: imeis.length }).eq('id', item.id);
+          await supabaseClient.from('produk').update({ imei_list: JSON.stringify(imeis), stok: imeis.length }).eq('id', item.id);
         }
       } else {
-        const { data: p } = await db.from('produk').select('stok').eq('id', item.id).single();
-        if (p) {
-          await db.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id);
-        }
+        const { data: p } = await supabaseClient.from('produk').select('stok').eq('id', item.id).single();
+        if (p) { await supabaseClient.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id); }
       }
     }
 
     let rincianBayar = (splitPayData.length > 1) ? splitPayData : [{ metode: metode, jumlah: Number(total) }];
-    let strukHtml = buildStrukHtml({
-      id: idTrx, tgl: new Date().toISOString(), kasir: currentUser.full_name, pelanggan: pel,
-      items: keranjangToSave, subtotal: subtotal, diskonStr: calc.diskonStr, diskonRp: diskonRp,
-      ttNama: calc.ttNama, ttNilai: calc.ttNilai, total: total, metode: metode,
-      rincian: rincianBayar, garansiBulan: Number(calc.masaGaransi) || 0
-    });
+    let strukHtml = buildStrukHtml({ id: idTrx, tgl: new Date().toISOString(), kasir: currentUser.full_name, pelanggan: pel, items: keranjangToSave, subtotal: subtotal, diskonStr: calc.diskonStr, diskonRp: diskonRp, ttNama: calc.ttNama, ttNilai: calc.ttNilai, total: total, metode: metode, rincian: rincianBayar, garansiBulan: Number(calc.masaGaransi) || 0 });
     document.getElementById('strukArea').innerHTML = strukHtml;
     document.getElementById('modalStruk').style.display = 'flex';
     keranjang = [];
@@ -1600,9 +1582,7 @@ async function processCheckout() {
     document.getElementById('masaGaransi').value = '0';
     document.getElementById('metodeBayar').value = 'Cash';
     toggleCicilanInput();
-    if (document.getElementById('useSplitPayment').checked) {
-      document.getElementById('useSplitPayment').checked = false; toggleSplitPayment();
-    }
+    if (document.getElementById('useSplitPayment').checked) { document.getElementById('useSplitPayment').checked = false; toggleSplitPayment(); }
     isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]';
     renderProduk(); renderKeranjang();
     showToast('Transaksi ' + idTrx + ' berhasil disimpan!');
