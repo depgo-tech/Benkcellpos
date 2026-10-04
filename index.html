@@ -720,7 +720,7 @@ function loadDashboard() {
     let trx = trxResult.data || [];
     let prods = prodResult.data || [];
     let trxPeriode = trx.filter(function(t) {
-      if (!t.tgl) return false;
+      if (!t.tgl) return true;
       let tgl = String(t.tgl).split('T')[0];
       if (!startDate || !endDate) return true;
       return tgl >= startDate && tgl <= endDate;
@@ -768,7 +768,7 @@ function loadRiwayat() {
     if (result.error) { t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red; padding:20px;">Error: ' + esc(result.error.message) + '</td></tr>'; return; }
     let d = result.data || [];
     let filtered = d.filter(function(trx) {
-      if (!trx.tgl) return false;
+      if (!trx.tgl) return true;
       let tgl = String(trx.tgl).split('T')[0];
       if (!startDate || !endDate) return true;
       return tgl >= startDate && tgl <= endDate;
@@ -1593,12 +1593,15 @@ function hitungTotal() {
 
     // Insert ke Supabase - HANYA kolom yang ada di tabel kamu
     const trxData = {
-      id: idTrx,
-      pelanggan: pel,
-      items: JSON.stringify(keranjangToSave), // STRINGIFY karena kolom TEXT
-      total: total,
-      metode: metode
-    };
+  id: idTrx,
+  tgl: new Date().toISOString(), // ← TAMBAH INI!
+  pelanggan: pel,
+  items: JSON.stringify(keranjangToSave),
+  total: total,
+  metode: metode
+};
+
+const { error: insertError } = await db.from('transaksi').insert([trxData]);
 
     const { error: insertError } = await db.from('transaksi').insert([trxData]);
     if (insertError) throw new Error('Gagal simpan: ' + insertError.message);
