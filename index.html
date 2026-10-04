@@ -1536,22 +1536,42 @@ async function processCheckout() {
     if (splitPayments.length === 1 && splitPayments[0].metode === 'Tukar Tambah') { ttDariSplit = splitPayments[0].jumlah; ttNamaDariSplit = (splitPayments[0].namaBarang || '').trim(); splitPayData = []; }
   }
   try {
-    const idTrx = 'TRX' + Date.now();
+    const idTrx = 'INV' + Date.now();
     const subtotal = keranjangToSave.reduce((s, i) => s + (i.harga * i.qty), 0);
     const dType = calc.diskonStr.toString().includes('%') ? '%' : 'rp';
     const dVal = parseFloat(calc.diskonStr) || 0;
     const diskonRp = dType === '%' ? (subtotal * dVal / 100) : dVal;
     const total = Math.max(0, subtotal - diskonRp - (calc.ttNilai || 0));
-    await db.from('transaksi').insert([{ id: idTrx, kasir: currentUser.full_name, pelanggan: pel, items: keranjangToSave, subtotal: subtotal, diskon_str: calc.diskonStr, diskon_rp: diskonRp, tt_nama: ttDariSplit > 0 ? ttNamaDariSplit : calc.ttNama, tt_imei: ttDariSplit > 0 ? '' : calc.ttImei, tt_nilai: (calc.ttNilai || 0) + ttDariSplit, total: total, metode: metode, rincian_bayar: splitPayData, masa_garansi: parseInt(calc.masaGaransi) || 0 }]);
+    
+    // FIX: Hanya insert kolom yang ADA di tabel transaksi
+    // items harus di-stringify karena kolom tipe TEXT
+    const trxData = {
+      id: idTrx,
+      pelanggan: pel,
+      items: JSON.stringify(keranjangToSave), // STRINGIFY karena kolom TEXT
+      total: total,
+      metode: metode
+    };
+    
+    // Coba insert dengan kolom minimal dulu
+    const { data: insertResult, error: insertError } = await supabaseClient.from('transaksi').insert([trxData]).select();
+    
+    if (insertError) {
+      throw new Error('Gagal simpan transaksi: ' + insertError.message);
+    }
+    
+    // Update stok produk
     for (const item of keranjangToSave) {
       if (item.imei) {
-        const { data: p } = await db.from('produk').select('imei_list, stok').eq('id', item.id).single();
-        if (p) { const imeis = safeParseJSON(p.imei_list).filter(im => im.imei !== item.imei); await db.from('produk').update({ imei_list: imeis, stok: imeis.length }).eq('id', item.id); }
+        const { data: p } = await supabaseClient.from('produk').select('imei_list, stok').eq('id', item.id).single();
+        if (p) { const imeis = safeParseJSON(p.imei_list).filter(im => im.imei !== item.imei); await supabaseClient.from('produk').update({ imei_list: JSON.stringify(imeis), stok: imeis.length }).eq('id', item.id); }
       } else {
-        const { data: p } = await db.from('produk').select('stok').eq('id', item.id).single();
-        if (p) { await db.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id); }
+        const { data: p } = await supabaseClient.from('produk').select('stok').eq('id', item.id).single();
+        if (p) { await supabaseClient.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id); }
       }
     }
+    
+    // Tampilkan struk
     let rincianBayar = (splitPayData.length > 1) ? splitPayData : [{ metode: metode, jumlah: Number(total) }];
     let strukHtml = buildStrukHtml({ id: idTrx, tgl: new Date().toISOString(), kasir: currentUser.full_name, pelanggan: pel, items: keranjangToSave, subtotal: subtotal, diskonStr: calc.diskonStr, diskonRp: diskonRp, ttNama: calc.ttNama, ttNilai: calc.ttNilai, total: total, metode: metode, rincian: rincianBayar, garansiBulan: Number(calc.masaGaransi) || 0 });
     document.getElementById('strukArea').innerHTML = strukHtml;
@@ -1578,10 +1598,10 @@ async function processCheckout() {
     isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false;
     let msg = (err && err.message) ? err.message : 'Terjadi kesalahan tidak diketahui';
     showToast('Gagal checkout: ' + msg, true);
+    console.error('Checkout error:', err);
     await refreshProdukFromServer();
   }
 }
-
 async function loadUsers() {
   try {
     const { data, error } = await db.from('users').select('id, username, full_name, role');
