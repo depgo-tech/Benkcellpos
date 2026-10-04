@@ -691,19 +691,28 @@ document.getElementById('greetingText').innerText = greeting + ", " + (currentUs
 let startDate = document.getElementById('dashDateStart').value;
 let endDate = document.getElementById('dashDateEnd').value;
 try {
-const { data: trx, error: trxError } = await supabaseClient.from('transaksi').select('*');
-const { data: prods, error: prodError } = await supabaseClient.from('produk').select('*');
+const { data: trx, error: trxError } = await supabase.from('transaksi').select('*');
+const { data: prods, error: prodError } = await supabase.from('produk').select('*');
 if (trxError || prodError) throw trxError || prodError;
-const trxPeriode = (trx || []).filter(t => { const tgl = t.tgl.split('T')[0]; return tgl >= startDate && tgl <= endDate; });
-const penjualanPeriode = trxPeriode.reduce((s, t) => s + (t.total || 0), 0);
-const hppPeriode = 0; const labaPeriode = penjualanPeriode - hppPeriode;
-const totalStok = (prods || []).reduce((s, p) => s + (p.stok || 0), 0);
-const lowStok = (prods || []).filter(p => (p.stok || 0) <= 5).map(p => ({ nama: p.nama, varian: p.varian, stok: p.stok }));
-const chartLabels = []; const chartData = [];
+// FIX: Filter tanggal yang lebih robust
+const trxPeriode = (trx || []).filter(t => {
+if (!t.tgl) return false;
+const tgl = String(t.tgl).split('T')[0];
+if (!startDate || !endDate) return true;
+return tgl >= startDate && tgl <= endDate;
+});
+const penjualanPeriode = trxPeriode.reduce((s, t) => s + (Number(t.total) || 0), 0);
+const hppPeriode = 0;
+const labaPeriode = penjualanPeriode - hppPeriode;
+const totalStok = (prods || []).reduce((s, p) => s + (Number(p.stok) || 0), 0);
+const lowStok = (prods || []).filter(p => (Number(p.stok) || 0) <= 5).map(p => ({ nama: p.nama, varian: p.varian, stok: p.stok }));
+const chartLabels = [];
+const chartData = [];
 for (let i = 6; i >= 0; i--) {
-const d = new Date(); d.setDate(d.getDate() - i);
+const d = new Date();
+d.setDate(d.getDate() - i);
 const dateStr = d.toISOString().split('T')[0];
-const dayTotal = trxPeriode.filter(t => t.tgl.split('T')[0] === dateStr).reduce((s, t) => s + (t.total || 0), 0);
+const dayTotal = trxPeriode.filter(t => String(t.tgl).split('T')[0] === dateStr).reduce((s, t) => s + (Number(t.total) || 0), 0);
 chartLabels.push(d.toLocaleDateString('id-ID', { weekday: 'short' }));
 chartData.push(dayTotal);
 }
@@ -733,9 +742,13 @@ let endDate = document.getElementById('riwayatDateEnd').value;
 let t = document.getElementById('riwayatTrxTable');
 t.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">Memuat riwayat...</td></tr>';
 try {
-const { data, error } = await supabaseClient.from('transaksi').select('*');
+const { data, error } = await supabase.from('transaksi').select('*').order('tgl', { ascending: false });
 if (error) throw error;
-const filtered = (data || []).filter(trx => { const tgl = trx.tgl.split('T')[0]; return tgl >= startDate && tgl <= endDate; });
+const filtered = (data || []).filter(trx => {
+if (!startDate || !endDate) return true;
+const tgl = trx.tgl.split('T')[0];
+return tgl >= startDate && tgl <= endDate;
+});
 allRiwayatData = filtered;
 let totalPenjualan = 0, totalHpp = 0;
 filtered.forEach(function(r) { totalPenjualan += Number(r.total) || 0; totalHpp += Number(r.hpp) || 0; });
@@ -747,13 +760,11 @@ if (!filtered || filtered.length === 0) { t.innerHTML = '<tr><td colspan="7" sty
 let html = '';
 filtered.forEach(function (r, idx) {
 let dateStr = new Date(r.tgl).toLocaleString('id-ID');
-let itemsTxt = '';
-try {
-  const itemsArr = (typeof r.items === 'string') ? JSON.parse(r.items) : (r.items || []);
-  itemsTxt = (Array.isArray(itemsArr) ? itemsArr : []).map(it => typeof it === 'object' ? it.nama : it).join(', ');
-} catch(e) {
-  itemsTxt = String(r.items || '');
-}
+// FIX: Parse items yang mungkin berupa string JSON
+let itemsArr = r.items;
+if (typeof itemsArr === 'string') { try { itemsArr = JSON.parse(itemsArr); } catch(e) { itemsArr = []; } }
+if (!Array.isArray(itemsArr)) itemsArr = [];
+let itemsTxt = itemsArr.map(it => typeof it === 'object' ? (it.nama || '') : String(it)).join(', ');
 html += '<tr style="border-bottom:1px solid #f5f5f5;"><td style="padding:12px; font-weight:500;">' + esc(r.id) + '</td><td style="padding:12px; color:var(--text-gray);">' + esc(dateStr) + '</td><td style="padding:12px;">' + esc(r.pelanggan) + '</td><td style="padding:12px; font-size:12px;">' + esc(itemsTxt) + '</td><td style="padding:12px; font-weight:600;">Rp ' + Number(r.total).toLocaleString('id-ID') + '</td><td style="padding:12px;">' + esc(r.metode) + '</td><td style="padding:12px; white-space:nowrap;"><button class="btn-action" onclick="cetakUlangStruk(' + idx + ')">Cetak</button><button class="btn-action danger" onclick="confirmDelete(\'' + esc(r.id) + '\', \'transaksi\')">Hapus</button></td></tr>';
 });
 t.innerHTML = html;
@@ -781,7 +792,10 @@ strukHtml += '<div style="display:flex; justify-content:space-between;"><span>Tg
 strukHtml += '<div style="display:flex; justify-content:space-between;"><span>Kasir</span><span>' + esc(trx.kasir || '-') + '</span></div>';
 strukHtml += '<div style="display:flex; justify-content:space-between;"><span>Pelanggan</span><span>' + esc(trx.pelanggan || 'Umum') + '</span></div>';
 strukHtml += '</div><div class="struk-divider"></div>';
-(trx.items || []).forEach(function (it) {
+let itemsArr = trx.items;
+if (typeof itemsArr === 'string') { try { itemsArr = JSON.parse(itemsArr); } catch(e) { itemsArr = []; } }
+if (!Array.isArray(itemsArr)) itemsArr = [];
+itemsArr.forEach(function (it) {
 if (typeof it === 'object') {
 let nama = it.nama + (it.varian ? ' ' + it.varian : '') + (it.storage ? ' (' + it.storage + ')' : '') + (it.imei ? ' [IMEI:' + it.imei + ']' : '');
 let qty = Number(it.qty) || 1;
@@ -804,18 +818,27 @@ return strukHtml;
 }
 
 async function cetakUlangStruk(idx) {
-let r = allRiwayatData[idx]; if (!r) return;
+let r = allRiwayatData[idx];
+if (!r) return;
 if (allGaransiData.length === 0) await loadGaransi();
 let garansiBulan = 0;
 let g = allGaransiData.find(function (x) { return x.invoice === r.id; });
 if (g) garansiBulan = g.masa_garansi;
-let itemsDetail = r.items || [];
+// FIX: Parse items dengan aman
+let itemsDetail = r.items;
+if (typeof itemsDetail === 'string') { try { itemsDetail = JSON.parse(itemsDetail); } catch(e) { itemsDetail = []; } }
+if (!Array.isArray(itemsDetail)) itemsDetail = [];
 let subtotal = null, diskonRp = null;
 if (itemsDetail && itemsDetail.length > 0) {
 subtotal = itemsDetail.reduce(function (s, it) { return s + Number(it.harga) * (Number(it.qty) || 1); }, 0);
 diskonRp = Math.max(0, subtotal - (Number(r.tt_nilai) || 0) - (Number(r.total) || 0));
 }
-let strukHtml = buildStrukHtml({ id: r.id, tgl: r.tgl, kasir: r.kasir || '', pelanggan: r.pelanggan, items: itemsDetail, subtotal: subtotal, diskonStr: r.diskon_str, diskonRp: diskonRp, ttNama: r.tt_nama, ttNilai: r.tt_nilai, total: r.total, metode: r.metode, rincian: r.rincian_bayar, garansiBulan: garansiBulan });
+let strukHtml = buildStrukHtml({
+id: r.id, tgl: r.tgl, kasir: r.kasir || '', pelanggan: r.pelanggan,
+items: itemsDetail, subtotal: subtotal, diskonStr: r.diskon_str, diskonRp: diskonRp,
+ttNama: r.tt_nama, ttNilai: r.tt_nilai, total: r.total, metode: r.metode,
+rincian: r.rincian_bayar, garansiBulan: garansiBulan
+});
 document.getElementById('strukArea').innerHTML = strukHtml;
 document.getElementById('modalStruk').style.display = 'flex';
 }
