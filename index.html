@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <link id="favicon" rel="icon" href="https://z-cdn-media.chatglm.cn/files/dc6c73f6-138a-412e-a264-31156515be3c.png?auth_key=1884567107-72bf1055260449dc8458f2ae15aa7234-0-4942ebeed415e86d99ac303657546dae">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
 <style>
 :root { --sidebar-bg: #000000; --main-bg: #f4f6f9; --card-bg: #ffffff; --text-dark: #111111; --text-gray: #666666; --border-color: #e0e0e0; --danger: #dc3545; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; }
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
@@ -523,7 +522,23 @@ function wibToday() {
 }
 
 function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
-function formatRupiah(input) {
+    function callApi(funcName, args) {
+      return fetch(`/api/${funcName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-app-key': 'benkcell-pos-k9x7f3m2q8vz5r1t4w6y1234567' },
+        body: JSON.stringify(args || {})
+      }).then(r => {
+        if (!r.ok) {
+          return r.text().then(t => {
+            let msg = 'Server Error (' + r.status + ')';
+            try { let e = JSON.parse(t); if (e.error) msg = e.error; } catch (x) { if (t) msg = t.substring(0, 200); }
+            throw new Error(msg);
+          });
+        }
+        return r.json();
+      });
+    }
+  function formatRupiah(input) {
   let val = input.value.replace(/[^0-9]/g, '');
   if (val) { input.value = parseInt(val).toLocaleString('id-ID'); } else { input.value = ''; }
 }
@@ -1513,94 +1528,110 @@ function hitungTotal() {
 }
 
 // FIX #13: processCheckout dengan safeParseJSON untuk imei_list
-async function processCheckout() {
-  if (keranjang.length === 0 || isCheckingOut) return;
-  isCheckingOut = true;
-  let btn = document.getElementById('btnCheckout');
-  btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div> Memproses...';
-  let pel = document.getElementById('namaPelanggan').value.trim() || 'Umum';
-  let metode = document.getElementById('metodeBayar').value;
-  if (metode === 'Cicilan') { let namaCicilan = document.getElementById('namaCicilan').value.trim(); if (namaCicilan) metode = 'Cicilan - ' + namaCicilan; }
-  let calc = hitungTotal();
-  let keranjangToSave = JSON.parse(JSON.stringify(keranjang));
-  let splitPayData = []; let ttDariSplit = 0; let ttNamaDariSplit = '';
-  if (document.getElementById('useSplitPayment').checked && splitPayments.length > 0) {
-    let adaTtSplit = splitPayments.some(function (sp) { return sp.metode === 'Tukar Tambah' && sp.jumlah > 0; });
-    if (adaTtSplit && calc.ttNilai > 0) { showToast('Tukar Tambah sudah diisi di Split Payment. Hilangkan centang "Pakai Tukar Tambah?" dulu!', true); isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return; }
-    let totalSplit = splitPayments.reduce((sum, sp) => sum + sp.jumlah, 0);
-    if (totalSplit < calc.total) { showToast('Total split payment kurang dari total belanja!', true); isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return; }
-    splitPayData = splitPayments.map(function (sp) {
-      if (sp.metode === 'Cicilan') { let nm = (sp.namaCicilan || '').trim(); return { metode: nm ? ('Cicilan - ' + nm) : 'Cicilan', jumlah: sp.jumlah }; }
-      if (sp.metode === 'Tukar Tambah') { let nm = (sp.namaBarang || '').trim(); return { metode: nm ? ('Tukar Tambah - ' + nm) : 'Tukar Tambah', jumlah: sp.jumlah }; }
-      return { metode: sp.metode, jumlah: sp.jumlah };
-    });
-    if (splitPayments.length === 1 && splitPayments[0].metode === 'Tukar Tambah') { ttDariSplit = splitPayments[0].jumlah; ttNamaDariSplit = (splitPayments[0].namaBarang || '').trim(); splitPayData = []; }
-  }
-  try {
-    const idTrx = 'INV' + Date.now();
-    const subtotal = keranjangToSave.reduce((s, i) => s + (i.harga * i.qty), 0);
-    const dType = calc.diskonStr.toString().includes('%') ? '%' : 'rp';
-    const dVal = parseFloat(calc.diskonStr) || 0;
-    const diskonRp = dType === '%' ? (subtotal * dVal / 100) : dVal;
-    const total = Math.max(0, subtotal - diskonRp - (calc.ttNilai || 0));
-
-    // HANYA insert kolom yang ADA di tabel transaksi kamu!
-    const trxData = {
-      id: idTrx,
-      pelanggan: pel,
-      items: JSON.stringify(keranjangToSave), // STRINGIFY karena kolom TEXT
-      total: total,
-      metode: metode
-      // tgl akan auto-fill dari default Supabase (now())
-    };
-
-    const { error: insertError } = await supabaseClient.from('transaksi').insert([trxData]);
-    if (insertError) throw new Error('Gagal simpan: ' + insertError.message);
-
-    // Update stok
-    for (const item of keranjangToSave) {
-      if (item.imei) {
-        const { data: p } = await supabaseClient.from('produk').select('imei_list, stok').eq('id', item.id).single();
-        if (p) {
-          const imeis = (Array.isArray(p.imei_list) ? p.imei_list : []).filter(im => im.imei !== item.imei);
-          await supabaseClient.from('produk').update({ imei_list: JSON.stringify(imeis), stok: imeis.length }).eq('id', item.id);
-        }
-      } else {
-        const { data: p } = await supabaseClient.from('produk').select('stok').eq('id', item.id).single();
-        if (p) { await supabaseClient.from('produk').update({ stok: Math.max(0, (p.stok || 0) - item.qty) }).eq('id', item.id); }
+    function processCheckout() {
+      if (keranjang.length === 0 || isCheckingOut) return;
+      isCheckingOut = true;
+      let btn = document.getElementById('btnCheckout');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner-white"></div> Memproses...';
+      let pel = document.getElementById('namaPelanggan').value.trim() || 'Umum';
+      let metode = document.getElementById('metodeBayar').value;
+      if (metode === 'Cicilan') {
+        let namaCicilan = document.getElementById('namaCicilan').value.trim();
+        if (namaCicilan) metode = 'Cicilan - ' + namaCicilan;
       }
-    }
+      let calc = hitungTotal();
+      let keranjangToSave = JSON.parse(JSON.stringify(keranjang));
 
-    let rincianBayar = (splitPayData.length > 1) ? splitPayData : [{ metode: metode, jumlah: Number(total) }];
-    let strukHtml = buildStrukHtml({ id: idTrx, tgl: new Date().toISOString(), kasir: currentUser.full_name, pelanggan: pel, items: keranjangToSave, subtotal: subtotal, diskonStr: calc.diskonStr, diskonRp: diskonRp, ttNama: calc.ttNama, ttNilai: calc.ttNilai, total: total, metode: metode, rincian: rincianBayar, garansiBulan: Number(calc.masaGaransi) || 0 });
-    document.getElementById('strukArea').innerHTML = strukHtml;
-    document.getElementById('modalStruk').style.display = 'flex';
-    keranjang = [];
-    document.getElementById('namaPelanggan').value = '';
-    document.getElementById('diskonInput').value = 0;
-    hapusTukarTambah();
-    document.getElementById('masaGaransi').value = '0';
-    document.getElementById('metodeBayar').value = 'Cash';
-    toggleCicilanInput();
-    if (document.getElementById('useSplitPayment').checked) { document.getElementById('useSplitPayment').checked = false; toggleSplitPayment(); }
-    isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]';
-    renderProduk(); renderKeranjang();
-    showToast('Transaksi ' + idTrx + ' berhasil disimpan!');
-    await refreshProdukFromServer();
-    if (document.getElementById('view-riwayat').classList.contains('active')) await loadRiwayat();
-    if (document.getElementById('view-dashboard').classList.contains('active')) await loadDashboard();
-    if (document.getElementById('view-produk').classList.contains('active')) loadTableProduk();
-    if (document.getElementById('view-garansi').classList.contains('active')) await loadGaransi();
-    if (document.getElementById('view-konsinyasi').classList.contains('active')) await loadKonsinyasi();
-    if (document.getElementById('view-stok').classList.contains('active')) await loadStokLog();
-  } catch (err) {
-    isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false;
-    let msg = (err && err.message) ? err.message : 'Terjadi kesalahan tidak diketahui';
-    showToast('Gagal checkout: ' + msg, true);
-    console.error('Checkout error:', err);
-    await refreshProdukFromServer();
-  }
-}
+      let splitPayData = [];
+      let ttDariSplit = 0;
+      let ttNamaDariSplit = '';
+      if (document.getElementById('useSplitPayment').checked && splitPayments.length > 0) {
+        let adaTtSplit = splitPayments.some(function (sp) { return sp.metode === 'Tukar Tambah' && sp.jumlah > 0; });
+        if (adaTtSplit && calc.ttNilai > 0) {
+          showToast('Tukar Tambah sudah diisi di Split Payment. Hilangkan centang "Pakai Tukar Tambah?" dulu!', true);
+          isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return;
+        }
+        let totalSplit = splitPayments.reduce((sum, sp) => sum + sp.jumlah, 0);
+        if (totalSplit < calc.total) {
+          showToast('Total split payment kurang dari total belanja!', true);
+          isCheckingOut = false; btn.innerHTML = 'Bayar [Enter]'; btn.disabled = false; return;
+        }
+        splitPayData = splitPayments.map(function (sp) {
+          if (sp.metode === 'Cicilan') {
+            let nm = (sp.namaCicilan || '').trim();
+            return { metode: nm ? ('Cicilan - ' + nm) : 'Cicilan', jumlah: sp.jumlah };
+          }
+          if (sp.metode === 'Tukar Tambah') {
+            let nm = (sp.namaBarang || '').trim();
+            return { metode: nm ? ('Tukar Tambah - ' + nm) : 'Tukar Tambah', jumlah: sp.jumlah };
+          }
+          return { metode: sp.metode, jumlah: sp.jumlah };
+        });
+        if (splitPayments.length === 1 && splitPayments[0].metode === 'Tukar Tambah') {
+          ttDariSplit = splitPayments[0].jumlah;
+          ttNamaDariSplit = (splitPayments[0].namaBarang || '').trim();
+          splitPayData = [];
+        }
+      }
+
+      callApi('simpanTransaksi', {
+        keranjang: keranjangToSave,
+        pelanggan: pel,
+        diskonStr: calc.diskonStr,
+        metode: metode,
+        ttNama: ttDariSplit > 0 ? ttNamaDariSplit : calc.ttNama,
+        ttImei: ttDariSplit > 0 ? '' : calc.ttImei,
+        ttNilai: (calc.ttNilai || 0) + ttDariSplit,
+        masaGaransi: calc.masaGaransi,
+        splitPayments: splitPayData,
+        kasir: currentUser.full_name
+      }).then(function (res) {
+        let rincianBayar = (splitPayData.length > 1) ? splitPayData : [{ metode: metode, jumlah: Number(res.total) }];
+        document.getElementById('strukArea').innerHTML = buildStrukHtml({
+          id: res.idTrx, tgl: new Date().toISOString(), kasir: currentUser.full_name, pelanggan: pel,
+          items: keranjangToSave, subtotal: calc.sub, diskonStr: calc.diskonStr, diskonRp: calc.diskonRp,
+          ttNama: calc.ttNama, ttNilai: calc.ttNilai, total: res.total, metode: metode,
+          rincian: rincianBayar, garansiBulan: Number(calc.masaGaransi) || 0
+        });
+        document.getElementById('modalStruk').style.display = 'flex';
+
+        keranjangToSave.forEach(function (item) {
+          var p = allProduk.find(function (x) { return x[0] === item.id; });
+          if (p) {
+            if (item.imei) { p[8] = p[8].filter(im => im.imei !== item.imei); p[5] = p[8].length; }
+            else { p[5] = Number(p[5]) - Number(item.qty); }
+          }
+        });
+        keranjang = [];
+        document.getElementById('namaPelanggan').value = '';
+        document.getElementById('diskonInput').value = 0;
+        hapusTukarTambah();
+        document.getElementById('masaGaransi').value = '0';
+        document.getElementById('metodeBayar').value = 'Cash';
+        toggleCicilanInput();
+        if (document.getElementById('useSplitPayment').checked) {
+          document.getElementById('useSplitPayment').checked = false;
+          toggleSplitPayment();
+        }
+        isCheckingOut = false;
+        btn.innerHTML = 'Bayar [Enter]';
+        renderProduk(); renderKeranjang();
+        showToast('Transaksi ' + res.idTrx + ' berhasil disimpan!');
+        if (document.getElementById('view-riwayat').classList.contains('active')) loadRiwayat();
+        if (document.getElementById('view-dashboard').classList.contains('active')) loadDashboard();
+        if (document.getElementById('view-produk').classList.contains('active')) loadTableProduk();
+        if (document.getElementById('view-garansi').classList.contains('active')) loadGaransi();
+        if (document.getElementById('view-konsinyasi').classList.contains('active')) loadKonsinyasi();
+        if (document.getElementById('view-stok').classList.contains('active')) loadStokLog();
+      }).catch(function (err) {
+        isCheckingOut = false;
+        btn.innerHTML = 'Bayar [Enter]';
+        btn.disabled = false;
+        showToast('Gagal checkout: ' + (err && err.message ? err.message : ''), true);
+        refreshProdukFromServer();
+      });
+    }
 async function loadUsers() {
   try {
     const { data, error } = await db.from('users').select('id, username, full_name, role');
