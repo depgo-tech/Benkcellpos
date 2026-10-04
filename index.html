@@ -735,7 +735,7 @@ function loadDashboard() {
       let dateStr = d.toISOString().split('T')[0];
       let dayTotal = trxPeriode.filter(function(t) {
         if (!t.tgl) return false;
-        return String(t.tgl).split('T')[0] === dateStr;
+        return getWibDate(t.tgl) === dateStr;
       }).reduce(function(s, t) { return s + (Number(t.total) || 0); }, 0);
       chartLabels.push(d.toLocaleDateString('id-ID', { weekday: 'short' }));
       chartData.push(dayTotal);
@@ -892,7 +892,7 @@ async function cetakLaporanHarian() {
     if (error) throw error;
     const filtered = (trx || []).filter(t => {
       if (!t.tgl) return false;
-      const tgl = String(t.tgl).split('T')[0];
+      const tgl = getWibDate(t.tgl);
       return tgl >= startDate && tgl <= endDate;
     });
     const totalPenjualan = filtered.reduce((s, t) => s + (Number(t.total) || 0), 0);
@@ -1715,16 +1715,89 @@ async function addUser() {
 function confirmDelete(id, type) { targetDeleteId = id; targetDeleteType = type; document.getElementById('modalConfirm').style.display = 'flex'; }
 
 async function executeDelete() {
-  closeModal('modalConfirm'); if (!targetDeleteId) return;
+  closeModal('modalConfirm');
+  if (!targetDeleteId) return;
   try {
-    if (targetDeleteType === 'produk') { const { error } = await db.from('produk').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Produk dihapus!'); await refreshProdukFromServer(); loadTableProduk(); }
-    else if (targetDeleteType === 'user') { const { error } = await db.from('users').delete().eq('id', targetDeleteId); if (error) throw error; showToast('User dihapus!'); await loadUsers(); }
-    else if (targetDeleteType === 'mitra') { const { error } = await db.from('mitra').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Mitra dihapus!'); await loadKonsinyasi(); await refreshProdukFromServer(); }
-    else if (targetDeleteType === 'transaksi') { const { error } = await db.from('transaksi').delete().eq('id', targetDeleteId); if (error) throw error; showToast('Transaksi dihapus!'); await loadRiwayat(); await refreshProdukFromServer(); if (document.getElementById('view-dashboard').classList.contains('active')) await loadDashboard(); }
-  } catch(err) { showToast('Gagal menghapus: ' + (err && err.message ? err.message : ''), true); }
-  targetDeleteId = null; targetDeleteType = '';
+    if (targetDeleteType === 'produk') {
+      const { error } = await db.from('produk').delete().eq('id', targetDeleteId);
+      if (error) throw error;
+      showToast('Produk dihapus!');
+      await refreshProdukFromServer();
+      loadTableProduk();
+    }
+    else if (targetDeleteType === 'user') {
+      const { error } = await db.from('users').delete().eq('id', targetDeleteId);
+      if (error) throw error;
+      showToast('User dihapus!');
+      await loadUsers();
+    }
+    else if (targetDeleteType === 'mitra') {
+      const { error } = await db.from('mitra').delete().eq('id', targetDeleteId);
+      if (error) throw error;
+      showToast('Mitra dihapus!');
+      await loadKonsinyasi();
+      await refreshProdukFromServer();
+    }
+    else if (targetDeleteType === 'transaksi') {
+      // STEP 1: Ambil data transaksi dulu sebelum dihapus
+      const { data: trxData, error: fetchError } = await db.from('transaksi').select('*').eq('id', targetDeleteId).single();
+      if (fetchError) throw fetchError;
+      
+      // STEP 2: Kembalikan stok dari items transaksi
+      if (trxData && trxData.items) {
+        let itemsArr = trxData.items;
+        if (typeof itemsArr === 'string') {
+          try { itemsArr = JSON.parse(itemsArr); } catch(e) { itemsArr = []; }
+        }
+        if (Array.isArray(itemsArr)) {
+          for (const item of itemsArr) {
+            if (item && item.id) {
+              const qty = Number(item.qty) || 1;
+              if (item.imei) {
+                // Untuk produk dengan IMEI: tambahkan kembali IMEI ke imei_list
+                const { data: p } = await db.from('produk').select('imei_list, stok').eq('id', item.id).single();
+                if (p) {
+                  const imeis = safeParseJSON(p.imei_list);
+                  // Cek apakah IMEI sudah ada
+                  const imeiExists = imeis.some(im => im.imei === item.imei);
+                  if (!imeiExists) {
+                    imeis.push({ imei: item.imei, status: 'tersedia' });
+                  }
+                  await db.from('produk').update({ 
+                    imei_list: imeis, 
+                    stok: imeis.length 
+                  }).eq('id', item.id);
+                }
+              } else {
+                // Untuk produk tanpa IMEI: tambahkan kembali qty ke stok
+                const { data: p } = await db.from('produk').select('stok').eq('id', item.id).single();
+                if (p) {
+                  const newStok = (Number(p.stok) || 0) + qty;
+                  await db.from('produk').update({ stok: newStok }).eq('id', item.id);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // STEP 3: Hapus transaksi dari database
+      const { error: deleteError } = await db.from('transaksi').delete().eq('id', targetDeleteId);
+      if (deleteError) throw deleteError;
+      
+      showToast('Transaksi dihapus! Stok sudah dikembalikan.');
+      await loadRiwayat();
+      await refreshProdukFromServer();
+      if (document.getElementById('view-dashboard').classList.contains('active')) await loadDashboard();
+      if (document.getElementById('view-produk').classList.contains('active')) loadTableProduk();
+    }
+  } catch(err) {
+    showToast('Gagal menghapus: ' + (err && err.message ? err.message : ''), true);
+    console.error('Delete error:', err);
+  }
+  targetDeleteId = null;
+  targetDeleteType = '';
 }
-
 async function loadPengaturan() {
   try {
     const { data, error } = await db.from('pengaturan').select('*').eq('id', 1).single();
