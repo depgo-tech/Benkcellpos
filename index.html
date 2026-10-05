@@ -1594,7 +1594,7 @@ function hitungTotal() {
     // Insert ke Supabase - HANYA kolom yang ada di tabel kamu
     const trxData = {
   id: idTrx,
-  tgl: new Date().toISOString(), // ← TAMBAH INI!
+  tgl: new Date(Date.now() + 7 * 3600 * 1000).toISOString(), // ← TAMBAH INI!
   pelanggan: pel,
   items: JSON.stringify(keranjangToSave),
   total: total,
@@ -1621,7 +1621,7 @@ function hitungTotal() {
 
     let rincianBayar = (splitPayData.length > 1) ? splitPayData : [{ metode: metode, jumlah: Number(total) }];
     let strukHtml = buildStrukHtml({
-      id: idTrx, tgl: new Date().toISOString(), kasir: currentUser.full_name, pelanggan: pel,
+      id: idTrx, tgl: new Date(Date.now() + 7 * 3600 * 1000).toISOString(), kasir: currentUser.full_name, pelanggan: pel,
       items: keranjangToSave, subtotal: subtotal, diskonStr: calc.diskonStr, diskonRp: diskonRp,
       ttNama: calc.ttNama, ttNilai: calc.ttNilai, total: total, metode: metode,
       rincian: rincianBayar, garansiBulan: Number(calc.masaGaransi) || 0
