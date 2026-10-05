@@ -518,8 +518,12 @@ function safeParseJSON(data) {
 }
 
 // FIX #3: Helper tanggal WIB yang aman
-function wibToday() {
-  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
+// FIX: Konversi timestamp ke tanggal WIB
+function getWibDate(timestamp) {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  d.setHours(d.getHours() + 7); // Tambah 7 jam untuk WIB
+  return d.toISOString().split('T')[0];
 }
 
 function esc(s) { if (s === null || s === undefined) return ''; return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
@@ -721,7 +725,7 @@ function loadDashboard() {
     let prods = prodResult.data || [];
     let trxPeriode = trx.filter(function(t) {
       if (!t.tgl) return true;
-      let tgl = String(t.tgl).split('T')[0];
+      let tgl = getWibDate(t.tgl);
       if (!startDate || !endDate) return true;
       return tgl >= startDate && tgl <= endDate;
     });
@@ -769,7 +773,7 @@ function loadRiwayat() {
     let d = result.data || [];
     let filtered = d.filter(function(trx) {
       if (!trx.tgl) return true;
-      let tgl = String(trx.tgl).split('T')[0];
+      let tgl = getWibDate(trx.tgl);
       if (!startDate || !endDate) return true;
       return tgl >= startDate && tgl <= endDate;
     });
