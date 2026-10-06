@@ -1475,6 +1475,19 @@ async function submitOpname() {
 /* ================= RIWAYAT TRANSAKSI ================= */
 function resetRiwayatFilterToday() { const t = todayStr(); $('riwayatDateStart').value = t; $('riwayatDateEnd').value = t; loadRiwayat(); }
 async function loadRiwayat() {
+  if (!$('btnTrxMassal')) {
+    try {
+      const hdr = document.querySelector('#view-riwayat .dashboard-header > div:last-child');
+      if (hdr) {
+        const b = document.createElement('button');
+        b.id = 'btnTrxMassal'; b.className = 'btn-add';
+        b.style.cssText = 'margin:0; align-self:flex-end; height:42px;';
+        b.textContent = '+ Transaksi Massal';
+        b.onclick = openTrxMassal;
+        hdr.appendChild(b);
+      }
+    } catch (e) {}
+  }
   try {
     const { start, end } = getRangeWib($('riwayatDateStart').value, $('riwayatDateEnd').value);
     const { data, error } = await supabase.from('transaksi').select('*').gte('tgl', start).lte('tgl', end).order('tgl', { ascending: false });
@@ -1537,14 +1550,15 @@ function hapusTrx(id) {
 }
 async function cetakLaporanHarian() {
   try {
+    if (!bleChar && !usbDevice) { toast('Hubungkan printer dulu di menu Printer', true); return; }
     const { start, end } = getRangeWib($('riwayatDateStart').value, $('riwayatDateEnd').value);
     const { data: trxData, error } = await supabase.from('transaksi').select('*').gte('tgl', start).lte('tgl', end).order('tgl', { ascending: true });
     if (error) throw error;
-    let totalPenjualan = 0, totalHpp = 0;
-    const metodeMap = {}, produkTerjual = {}, list = [];
+    let totalPenjualan = 0, totalHpp = 0, jumlahTrx = 0;
+    const metodeMap = {}, produkTerjual = {};
     (trxData || []).forEach(row => {
       const total = Number(row.total) || 0, hpp = Number(row.hpp) || 0;
-      totalPenjualan += total; totalHpp += hpp;
+      totalPenjualan += total; totalHpp += hpp; jumlahTrx++;
       const rincian = (Array.isArray(row.rincian_bayar) && row.rincian_bayar.length > 0) ? row.rincian_bayar : parseMetodeStr(row.metode, total);
       rincian.forEach(r => { const k = String(r.metode || 'Lainnya').trim(); metodeMap[k] = (metodeMap[k] || 0) + (Number(r.jumlah) || 0); });
       (row.items ? String(row.items).split(', ') : []).forEach(it => {
@@ -1553,25 +1567,28 @@ async function cetakLaporanHarian() {
         const nama = it.replace(/ x\d+$/, '').replace(/ \[IMEI:.*?\]/, '').trim();
         produkTerjual[nama] = (produkTerjual[nama] || 0) + qty;
       });
-      list.push({ id: row.id, tgl: row.tgl, pelanggan: row.pelanggan, items: row.items ? String(row.items).split(', ') : [], total, hpp, metode: row.metode });
     });
-    const rep = { periode: { start: $('riwayatDateStart').value, end: $('riwayatDateEnd').value }, jumlahTransaksi: list.length, totalPenjualan, totalHpp, totalLaba: totalPenjualan - totalHpp, rincianMetode: metodeMap, produkTerjual: Object.keys(produkTerjual).map(n => ({ nama: n, qty: produkTerjual[n] })), transaksi: list };
-    const w = window.open('', '_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>Laporan Penjualan</title><style>body{font-family:Arial;padding:24px;}h1{font-size:20px;}h2{font-size:15px;margin:18px 0 8px;}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;}th,td{border:1px solid #ccc;padding:6px;text-align:left;}th{background:#f4f4f4;}.r{text-align:right;}</style></head><body>
-      <h1>${esc(pengaturan.nama_toko || 'Benk cell')} — Laporan Penjualan</h1>
-      <p>Periode: ${esc(rep.periode.start)} s/d ${esc(rep.periode.end)} • Dicetak: ${tglID(new Date().toISOString(), true)}</p>
-      <table><tr><th>Jumlah Transaksi</th><th>Total Penjualan</th><th>Total HPP</th><th>Laba Kotor</th></tr>
-      <tr><td>${rep.jumlahTransaksi}</td><td class="r">${fmt(rep.totalPenjualan)}</td><td class="r">${fmt(rep.totalHpp)}</td><td class="r"><b>${fmt(rep.totalLaba)}</b></td></tr></table>
-      <h2>Rincian Metode Pembayaran</h2>
-      <table><tr><th>Metode</th><th>Total</th></tr>${Object.entries(rep.rincianMetode).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="r">${fmt(v)}</td></tr>`).join('')}</table>
-      <h2>Produk Terjual</h2>
-      <table><tr><th>Produk</th><th>Qty</th></tr>${rep.produkTerjual.map(p => `<tr><td>${esc(p.nama)}</td><td>${p.qty}</td></tr>`).join('') || '<tr><td colspan="2">-</td></tr>'}</table>
-      <h2>Detail Transaksi</h2>
-      <table><tr><th>Invoice</th><th>Tanggal</th><th>Pelanggan</th><th>Items</th><th class="r">Total</th><th>Metode</th></tr>
-      ${rep.transaksi.map(t => `<tr><td>${esc(t.id)}</td><td>${tglID(t.tgl, true)}</td><td>${esc(t.pelanggan || '-')}</td><td>${t.items.map(esc).join('<br>')}</td><td class="r">${fmt(t.total)}</td><td>${esc(t.metode || '')}</td></tr>`).join('')}</table>
-      </body></html>`);
-    w.document.close(); w.focus();
-    setTimeout(() => w.print(), 400);
+    const W = 32, L = [], push = (txt, a = 'l', b = false) => L.push({ t: txt, a, b });
+    push(pengaturan.nama_toko || 'BENK CELL', 'c', true);
+    push('LAPORAN PENJUALAN', 'c');
+    push($('riwayatDateStart').value || '-' + ' s/d ' + ($('riwayatDateEnd').value || '-'), 'c');
+    push(tglID(new Date().toISOString(), true), 'c');
+    push('-'.repeat(W));
+    push(twoCol('Jumlah Transaksi', String(jumlahTrx), W));
+    push(twoCol('Total Penjualan', 'Rp' + num(totalPenjualan), W));
+    push(twoCol('Total HPP', 'Rp' + num(totalHpp), W));
+    push(twoCol('Laba Kotor', 'Rp' + num(totalPenjualan - totalHpp), W), 'l', true);
+    push('-'.repeat(W));
+    push('METODE PEMBAYARAN', 'l', true);
+    Object.entries(metodeMap).forEach(([m, v]) => push(twoCol(' ' + m, num(v), W)));
+    push('-'.repeat(W));
+    push('PRODUK TERJUAL', 'l', true);
+    Object.keys(produkTerjual).forEach(n => push(twoCol(' ' + n, 'x' + produkTerjual[n], W)));
+    push('-'.repeat(W));
+    if (pengaturan.footer) push(pengaturan.footer, 'c');
+    push('Terima kasih', 'c');
+    const bytes = escposBytes(L);
+    if (bleChar) await blePrint(bytes); else await usbPrint(bytes);
   } catch (e) { toast(e.message, true); }
 }
 
@@ -1942,30 +1959,52 @@ document.addEventListener('keydown', e => {
   }
 });
 
-  /* ================= HPP MASSAL & TAMBAH MASSAL (BARU) ================= */
-function openHppBaru() {
+ function openHppBaru() {
   try {
     if (!$('modalHppBaru')) {
       const div = document.createElement('div');
       div.className = 'modal-overlay'; div.id = 'modalHppBaru';
-      div.innerHTML = `<div class="modal-content"><h3>Update HPP Massal</h3>
-        <p style="font-size:12px;color:#666;margin-bottom:10px;">Isi harga modal per produk lalu simpan sekaligus.</p>
-        <div id="hppListBaru" style="max-height:400px;overflow-y:auto;"></div>
+      div.innerHTML = `<div class="modal-content" style="max-width:520px;"><h3>Isi HPP Massal</h3>
+        <p style="font-size:12px; color:#666; margin-bottom:10px;">Isi cepat: masukkan persentase dari harga jual (cth: 90 = HPP 90% dari harga jual), lalu terapkan.</p>
+        <label style="font-size:13px; display:block; margin-bottom:6px; color:#333;">HPP = berapa % dari harga jual?</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+          <input type="text" id="hppPercentInput" inputmode="numeric" placeholder="cth: 90" style="flex:1; min-width:110px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+          <button class="btn-action" style="height:42px;" onclick="applyHppPercent(false)">Terapkan ke Semua</button>
+          <button class="btn-action" style="height:42px;" onclick="applyHppPercent(true)">Hanya yang Kosong</button>
+        </div>
+        <div class="table-scroll" style="border:1px solid #eee; border-radius:8px; margin-bottom:15px;">
+          <table class="data-table" style="min-width:430px;">
+            <thead><tr><th>Produk</th><th style="text-align:right;">Harga Jual</th><th>HPP (Modal)</th></tr></thead>
+            <tbody id="hppListBaru"></tbody>
+          </table>
+        </div>
         <button class="btn-save" onclick="submitHppBaru()">Simpan Semua HPP</button>
         <button class="btn-close-modal" onclick="closeModal('modalHppBaru')">Batal</button></div>`;
       document.body.appendChild(div);
     }
-    $('hppListBaru').innerHTML = allProduk.map(p => `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
-        <div style="flex:1;"><b style="font-size:13px;">${esc(p.nama)} ${esc(p.varian || '')}</b>
-        <div style="font-size:11px;color:#666;">${esc(p.storage || '')} • Jual ${fmt(p.harga)}</div></div>
-        <input type="text" class="hpp-input-baru" data-id="${p.id}" value="${p.hargaModal ? num(p.hargaModal) : ''}" oninput="formatRupiah(this)" placeholder="0" style="width:120px;padding:8px;border:1px solid #ddd;border-radius:8px;text-align:right;">
-      </div>`).join('') || '<p style="text-align:center;color:#999;padding:10px;">Belum ada produk</p>';
+    $('hppListBaru').innerHTML = allProduk.length ? allProduk.map(p => `
+      <tr>
+        <td style="font-size:13px;"><b>${esc(p.nama)}</b>${p.varian ? ' ' + esc(p.varian) : ''}${p.storage ? ' <span style="color:#999;">' + esc(p.storage) + '</span>' : ''}</td>
+        <td style="text-align:right; font-size:13px;">${num(p.harga)}</td>
+        <td><input type="text" class="hpp-input-baru" data-id="${p.id}" data-harga="${p.harga}" value="${p.hargaModal ? num(p.hargaModal) : ''}" oninput="formatRupiah(this)" placeholder="0" style="width:110px; padding:8px; border:1px solid #ddd; border-radius:8px; text-align:right;"></td>
+      </tr>`).join('') : '<tr><td colspan="3" style="text-align:center; color:#999;">Belum ada produk</td></tr>';
+    $('hppPercentInput').value = '';
     openModal('modalHppBaru');
   } catch (e) { toast('Error: ' + e.message, true); }
 }
+function applyHppPercent(onlyEmpty) {
+  const pct = parseNum($('hppPercentInput').value);
+  if (pct <= 0) { toast('Isi persentase dulu (cth: 90)', true); return; }
+  document.querySelectorAll('#hppListBaru .hpp-input-baru').forEach(inp => {
+    if (onlyEmpty && inp.value.trim()) return;
+    const harga = Number(inp.dataset.harga) || 0;
+    inp.value = num(Math.round(harga * pct / 100));
+  });
+  toast('HPP ' + pct + '% diterapkan' + (onlyEmpty ? ' ke yang kosong' : ' ke semua produk'));
+}
 async function submitHppBaru() {
   const inputs = [...document.querySelectorAll('#hppListBaru .hpp-input-baru')];
+  if (!inputs.length) { toast('Belum ada produk', true); return; }
   try {
     for (const inp of inputs) {
       const { error } = await supabase.from('produk').update({ harga_modal: parseNum(inp.value) }).eq('id', inp.dataset.id);
@@ -2020,6 +2059,162 @@ async function submitTambahMassal() {
   } catch (e) { toast(e.message, true); }
 }
 
+/* ================= TRANSAKSI MASSAL (NOTA MANUAL) ================= */
+let tmItems = [], tmStaged = [];
+function openTrxMassal() {
+  try {
+    if (!$('modalTrxMassal')) {
+      const div = document.createElement('div');
+      div.className = 'modal-overlay'; div.id = 'modalTrxMassal';
+      div.innerHTML = `<div class="modal-content" style="max-width:520px;">
+        <h3>Input Transaksi Massal (Nota Manual)</h3>
+        <p style="font-size:12px; color:#666; margin-bottom:12px;">Untuk memasukkan transaksi lama yang tercatat di nota kertas. Isi 1 nota → tekan <b>"+ Simpan ke Daftar"</b>, ulangi untuk nota berikutnya, lalu tekan <b>"Simpan Semua"</b>.</p>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px;">
+          <input type="checkbox" id="tmKurangiStok" checked> Kurangi stok produk sesuai item
+        </label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <div style="flex:1; min-width:130px;"><label style="font-size:11px; color:#666;">Tanggal Nota</label><input type="date" id="tmTanggal" class="date-picker" style="width:100%;"></div>
+          <div style="flex:1; min-width:110px;"><label style="font-size:11px; color:#666;">Jam</label><input type="time" id="tmJam" class="date-picker" style="width:100%;"></div>
+          <div style="flex:2; min-width:150px;"><label style="font-size:11px; color:#666;">Customer (opsional)</label><input type="text" id="tmPelanggan" placeholder="Nama customer" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;"></div>
+        </div>
+        <div style="border:1px solid #eee; padding:10px; border-radius:8px; margin-bottom:10px;">
+          <label style="font-size:12px; color:#666;">Tambah Item</label>
+          <select id="tmProduk" onchange="tmOnProductChange()" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px;"></select>
+          <div style="display:flex; gap:8px;">
+            <div id="tmQtyWrap" style="flex:1;"><input type="number" id="tmQty" value="1" min="1" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px;" placeholder="Qty"></div>
+            <div id="tmImeiWrap" class="hidden" style="flex:2;"><select id="tmImei" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px;"></select></div>
+            <button class="btn-add" style="margin:0;" onclick="tmAddItem()">+ Item</button>
+          </div>
+        </div>
+        <div id="tmItemList" style="max-height:120px; overflow-y:auto; border:1px solid #eee; border-radius:8px; padding:8px; margin-bottom:10px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <div style="flex:1; min-width:130px;"><label style="font-size:11px; color:#666;">Metode Bayar</label>
+          <select id="tmMetode" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px;">${METODE_OPTS.map(m => `<option>${m}</option>`).join('')}</select></div>
+          <div style="flex:1; min-width:130px;"><label style="font-size:11px; color:#666;">Total Nota (Rp)</label><input type="text" id="tmTotal" inputmode="numeric" oninput="formatRupiah(this)" placeholder="0" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; text-align:right;"></div>
+        </div>
+        <button class="btn-save" onclick="tmStageTransaction()">+ Simpan ke Daftar</button>
+        <h4 style="margin:15px 0 8px; font-size:14px;">Daftar Siap Simpan (<span id="tmStagedCount">0</span>)</h4>
+        <div id="tmStagedList" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:8px; padding:8px; margin-bottom:10px;"></div>
+        <button class="btn-save" id="btnTmSaveAll" onclick="tmSaveAll()">Simpan Semua ke Riwayat</button>
+        <button class="btn-close-modal" onclick="closeModal('modalTrxMassal')">Batal</button>
+      </div>`;
+      document.body.appendChild(div);
+    }
+    tmItems = []; tmStaged = [];
+    $('tmTanggal').value = todayStr();
+    const now = new Date();
+    $('tmJam').value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    $('tmPelanggan').value = ''; $('tmTotal').value = '';
+    tmRenderItems(); tmRenderStaged(); tmFillProducts();
+    openModal('modalTrxMassal');
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+function tmFillProducts() {
+  $('tmProduk').innerHTML = allProduk.map(p => `<option value="${p.id}">${esc(p.nama + ' ' + (p.varian || '') + (p.storage ? ' ' + p.storage : ''))} — Rp${num(p.harga)} (Stok: ${stokOf(p)})</option>`).join('');
+  tmOnProductChange();
+}
+function tmOnProductChange() {
+  const p = allProduk.find(x => x.id === $('tmProduk').value);
+  const isImei = p && p.imeis && p.imeis.length > 0;
+  $('tmImeiWrap').classList.toggle('hidden', !isImei);
+  $('tmQtyWrap').classList.toggle('hidden', isImei);
+  if (isImei) $('tmImei').innerHTML = p.imeis.map(im => `<option value="${esc(im.imei)}">${esc(im.imei)}</option>`).join('');
+}
+function tmAddItem() {
+  const p = allProduk.find(x => x.id === $('tmProduk').value);
+  if (!p) { toast('Pilih produk dulu', true); return; }
+  const isImei = p.imeis && p.imeis.length > 0;
+  const imei = isImei ? $('tmImei').value : null;
+  const qty = isImei ? 1 : Math.max(1, Number($('tmQty').value) || 1);
+  if (tmItems.some(i => i.id === p.id && i.imei === imei)) { toast('Item ini sudah ada di daftar', true); return; }
+  tmItems.push({ id: p.id, nama: p.nama, varian: p.varian || '', storage: p.storage || '', imei, qty, harga: p.harga });
+  tmRenderItems(); tmRecalcTotal(); $('tmQty').value = 1;
+}
+function tmRemoveItem(i) { tmItems.splice(i, 1); tmRenderItems(); tmRecalcTotal(); }
+function tmRenderItems() {
+  $('tmItemList').innerHTML = tmItems.length ? tmItems.map((it, i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #f5f5f5; font-size:12px;">
+      <span>${esc(it.nama + ' ' + it.varian + (it.storage ? ' ' + it.storage : ''))}${it.imei ? ' [IMEI: ' + esc(it.imei) + ']' : ''} x${it.qty}</span>
+      <span style="white-space:nowrap;">${fmt(it.harga * it.qty)} <b style="color:#dc3545; cursor:pointer;" onclick="tmRemoveItem(${i})">✕</b></span>
+    </div>`).join('') : '<p style="text-align:center; color:#999; font-size:12px;">Belum ada item</p>';
+}
+function tmRecalcTotal() { $('tmTotal').value = num(tmItems.reduce((s, i) => s + i.harga * i.qty, 0)); }
+function tmStageTransaction() {
+  if (!tmItems.length) { toast('Tambahkan minimal 1 item', true); return; }
+  const total = parseNum($('tmTotal').value);
+  if (total <= 0) { toast('Isi total nota', true); return; }
+  tmStaged.push({
+    tgl: $('tmTanggal').value || todayStr(),
+    jam: $('tmJam').value || '12:00',
+    pelanggan: $('tmPelanggan').value.trim(),
+    metode: $('tmMetode').value,
+    items: [...tmItems], total
+  });
+  tmItems = [];
+  $('tmPelanggan').value = ''; $('tmTotal').value = '';
+  tmRenderItems(); tmRenderStaged();
+  toast('Nota masuk daftar (' + tmStaged.length + ')');
+}
+function tmRemoveStaged(i) { tmStaged.splice(i, 1); tmRenderStaged(); }
+function tmRenderStaged() {
+  $('tmStagedCount').textContent = tmStaged.length;
+  $('tmStagedList').innerHTML = tmStaged.length ? tmStaged.map((t, i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #f5f5f5; font-size:12px;">
+      <span><b>${esc(t.tgl)}</b> ${esc(t.jam)} • ${esc(t.pelanggan || 'Umum')} • ${esc(t.metode)}<br>${t.items.map(it => esc(it.nama + (it.imei ? ' [' + it.imei + ']' : ' x' + it.qty))).join(', ')}</span>
+      <span style="white-space:nowrap;">${fmt(t.total)} <b style="color:#dc3545; cursor:pointer;" onclick="tmRemoveStaged(${i})">✕</b></span>
+    </div>`).join('') : '<p style="text-align:center; color:#999; font-size:12px;">Belum ada</p>';
+}
+async function tmSaveAll() {
+  if (!tmStaged.length) { toast('Daftar masih kosong', true); return; }
+  const kurangiStok = $('tmKurangiStok').checked;
+  const btn = $('btnTmSaveAll'); btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try {
+    const kasir = currentUser.full_name || currentUser.username;
+    for (let idx = 0; idx < tmStaged.length; idx++) {
+      const t = tmStaged[idx];
+      const d = new Date(t.tgl + 'T' + t.jam + ':00+07:00');
+      const tglIso = d.toISOString();
+      const idTrx = 'INV' + tglIso.replace(/[-:T]/g, '').split('.')[0] + (idx + 1) + Math.floor(Math.random() * 90 + 10);
+      let hppTotal = 0;
+      const itemsArr = [], itemsJson = [];
+      t.items.forEach(it => {
+        const prod = allProduk.find(p => p.id === it.id);
+        const modal = prod ? (prod.isKonsinyasi ? prod.hargaSetoran : prod.hargaModal) : 0;
+        hppTotal += modal * it.qty;
+        const storageTxt = it.storage ? ' (' + it.storage + ')' : '';
+        const imeiTxt = it.imei ? ' [IMEI:' + it.imei + ']' : '';
+        itemsArr.push(it.nama + ' ' + it.varian + storageTxt + imeiTxt + ' x' + it.qty);
+        itemsJson.push({ id: it.id, nama: it.nama, varian: it.varian || '', storage: it.storage || '', imei: it.imei || null, qty: it.qty, harga: it.harga });
+      });
+      const { error } = await supabase.from('transaksi').insert([{
+        id: idTrx, tgl: tglIso, pelanggan: t.pelanggan || null,
+        items: itemsArr.join(', '), items_json: itemsJson, kasir,
+        total: t.total, hpp: hppTotal, metode: t.metode, diskon: '0',
+        rincian_bayar: [{ metode: t.metode, jumlah: t.total }],
+        tt_nama: null, tt_imei: null, tt_nilai: 0
+      }]);
+      if (error) throw new Error('Gagal simpan nota ke-' + (idx + 1) + ': ' + error.message);
+      if (kurangiStok) {
+        for (const it of t.items) {
+          const { data: prod } = await supabase.from('produk').select('stok, imeis').eq('id', it.id).maybeSingle();
+          if (!prod) continue;
+          if (it.imei) {
+            const newImeis = (prod.imeis || []).filter(im => im.imei !== it.imei);
+            await supabase.from('produk').update({ imeis: newImeis, stok: newImeis.length }).eq('id', it.id);
+          } else {
+            await supabase.from('produk').update({ stok: Math.max(0, Number(prod.stok) - it.qty) }).eq('id', it.id);
+          }
+        }
+      }
+    }
+    toast(tmStaged.length + ' transaksi berhasil disimpan');
+    tmStaged = []; tmRenderStaged();
+    closeModal('modalTrxMassal');
+    await loadProduk(); loadRiwayat();
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; btn.textContent = 'Simpan Semua ke Riwayat';
+}
+  
 /* ================= INIT ================= */
 document.addEventListener('DOMContentLoaded', () => {
   ensureToastContainer();
