@@ -122,6 +122,14 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 .low-stock-list > div:last-child { flex: 1; overflow-y: auto; min-height: 0; }
 .chart-container { position: relative; overflow: hidden; }
 .chart-container canvas { max-width: 100%; }
+
+                           /* Fix Produk Hampir Habis: tinggi = grafik, bisa scroll, judul beku */
+.low-stock-list { display: flex; flex-direction: column; height: 350px; overflow: hidden; }
+.low-stock-list > div:last-child { flex: 1; overflow-y: auto; min-height: 0; }
+/* Fix grafik keluar kotak */
+.chart-container { position: relative; overflow: hidden; }
+.chart-container canvas { max-width: 100% !important; max-height: 100% !important; }
+                           
   </style>
 </head>
 <body>
@@ -2467,6 +2475,31 @@ async function testPrint() {
     else toast('Hubungkan printer dulu', true);
   } catch (e) { toast(e.message, true); }
 }
+/* ============ PATCH: GRAFIK DASHBOARD ANTI-OFFSIDE ============ */
+function renderChart(labels, data) {
+  try {
+    if (salesChart) { salesChart.destroy(); salesChart = null; }
+    const ctx = $('salesChart').getContext('2d');
+    const build = () => {
+      salesChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Penjualan', data, backgroundColor: '#000', borderRadius: 6, maxBarThickness: 60 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, ticks: { callback: v => v >= 1000000 ? 'Rp' + (v / 1000000) + 'jt' : v >= 1000 ? 'Rp' + (v / 1000) + 'rb' : v } }
+          }
+        }
+      });
+    };
+    // tunggu layout siap dulu baru gambar, biar canvas gak salah ukuran
+    requestAnimationFrame(() => setTimeout(build, 30));
+  } catch (e) {}
+}
+window.addEventListener('resize', () => { if (salesChart) salesChart.resize(); });
   
 /* ================= INIT ================= */
 document.addEventListener('DOMContentLoaded', () => {
