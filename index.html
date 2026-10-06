@@ -118,7 +118,11 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 @media (max-width: 480px) { .login-box { padding: 30px 20px; border-radius: 12px; } .login-box h2 { font-size: 20px; } .login-box p { font-size: 13px; margin-bottom: 20px; }
 .product-card { content-visibility: auto; contain-intrinsic-size: auto 230px; }
 .qty-btn { width: 26px; height: 26px; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
-</style>
+.low-stock-list { display: flex; flex-direction: column; height: 350px; overflow: hidden; }
+.low-stock-list > div:last-child { flex: 1; overflow-y: auto; min-height: 0; }
+.chart-container { position: relative; overflow: hidden; }
+.chart-container canvas { max-width: 100%; }
+  </style>
 </head>
 <body>
 <div id="login-view" class="login-view">
@@ -234,11 +238,16 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 <div id="view-riwayat" class="view" style="padding: 25px;">
 <div class="dashboard-header">
 <div><h2>Riwayat Transaksi</h2><p>Menampilkan transaksi hari ini secara default. Ubah rentang tanggal untuk membandingkan periode lain.</p></div>
-<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-<div style="display:flex; flex-direction:column; gap:3px;"><label style="font-size:11px; color:var(--text-gray); font-weight:600;">Dari</label><input type="date" id="riwayatDateStart" class="date-picker" onchange="loadRiwayat()"></div>
-<div style="display:flex; flex-direction:column; gap:3px;"><label style="font-size:11px; color:var(--text-gray); font-weight:600;">Sampai</label><input type="date" id="riwayatDateEnd" class="date-picker" onchange="loadRiwayat()"></div>
-<button class="btn-action" style="align-self:flex-end; height:42px;" onclick="resetRiwayatFilterToday()">Hari Ini</button>
-<button class="btn-add" style="margin:0; align-self:flex-end; height:42px;" onclick="cetakLaporanHarian()">Cetak Laporan</button>
+<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; width:100%;">
+<div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--border-color); border-radius:12px; padding:8px 12px; flex-wrap:wrap; flex:1;">
+<input type="date" id="riwayatDateStart" class="date-picker" style="border:none; padding:6px;" onchange="riwayatPage=1;loadRiwayat()">
+<span style="color:#999; font-size:13px;">s/d</span>
+<input type="date" id="riwayatDateEnd" class="date-picker" style="border:none; padding:6px;" onchange="riwayatPage=1;loadRiwayat()">
+<button class="btn-action" onclick="riwayatBulanIni()">Bulan Ini</button>
+<button class="btn-action" onclick="resetRiwayatFilterToday()">Hari Ini</button>
+<input type="text" id="riwayatSearch" class="search-box" style="min-width:200px; flex:1; margin-bottom:0;" placeholder="🔍 Cari nama / invoice / IMEI / produk..." oninput="riwayatSearchChanged()">
+</div>
+<button class="btn-add" style="margin:0; height:42px;" onclick="cetakLaporanHarian()">Cetak Laporan</button>
 </div>
 </div>
 <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
@@ -257,8 +266,15 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 <div id="view-garansi" class="view" style="padding: 25px;">
 <div class="dashboard-header">
 <div><h2>Data Garansi</h2><p>Daftar HP yang terjual beserta masa garansinya.</p></div>
-<div style="display:flex; gap:10px; align-items:center;">
-<input type="text" id="searchGaransi" class="search-box" placeholder="Cari Invoice / IMEI / Nama..." oninput="renderGaransiTable()" style="margin-bottom: 0; min-width: 250px;">
+<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; width:100%;">
+<div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--border-color); border-radius:12px; padding:8px 12px; flex-wrap:wrap; flex:1;">
+<input type="date" id="garansiDateStart" class="date-picker" style="border:none; padding:6px;" onchange="garansiPage=1;renderGaransiTable()">
+<span style="color:#999; font-size:13px;">s/d</span>
+<input type="date" id="garansiDateEnd" class="date-picker" style="border:none; padding:6px;" onchange="garansiPage=1;renderGaransiTable()">
+<button class="btn-action" onclick="garansiBulanIni()">Bulan Ini</button>
+<button class="btn-action" onclick="garansiHariIni()">Hari Ini</button>
+<input type="text" id="searchGaransi" class="search-box" style="min-width:200px; flex:1; margin-bottom:0;" placeholder="🔍 Cari invoice / IMEI / nama / produk..." oninput="garansiPage=1;renderGaransiTable()">
+</div>
 </div>
 </div>
 <div class="data-table table-scroll">
@@ -1222,9 +1238,10 @@ async function testPrint() {
 
 /* ================= HALAMAN PRODUK (ADMIN) ================= */
 function renderProdukPage() {
-  $('btnAddProdukContainer').innerHTML = `<button class="btn-add" onclick="openTambahProduk()">+ Tambah Produk</button>
-    <button class="btn-action" style="margin-bottom:20px;" onclick="openHppBaru()">Update HPP Massal</button>
-    <button class="btn-action" style="margin-bottom:20px;" onclick="openTambahMassal()">+ Tambah Massal</button>`;
+  $('btnAddProdukContainer').innerHTML = `
+    <button class="btn-add" style="margin:0 8px 20px 0;" onclick="openTambahProduk()">+ Tambah Produk</button>
+    <button class="btn-add" style="margin:0 8px 20px 0; background:#fff; color:#000; border:1px solid #000;" onclick="openHppBaru()">Update HPP Massal</button>
+    <button class="btn-add" style="margin:0 0 20px 0; background:#fff; color:#000; border:1px solid #000;" onclick="openTambahMassal()">+ Tambah Massal</button>`;
   renderProdukTable();
 }
 function renderProdukTable() {
@@ -1606,9 +1623,17 @@ async function loadGaransi() {
   } catch (e) { toast('Gagal memuat garansi: ' + e.message, true); }
 }
 function renderGaransiTable() {
-  const q = ($('searchGaransi').value || '').toLowerCase();
-  const list = lastGaransi.filter(g => !q || [g.invoice, g.imei, g.pelanggan, g.produk].join(' ').toLowerCase().includes(q));
-  $('garansiTable').innerHTML = list.length ? list.map(g => {
+  const q = (($('searchGaransi') || {}).value || '').toLowerCase().trim();
+  const ds = (($('garansiDateStart') || {}).value || ''), de = (($('garansiDateEnd') || {}).value || '');
+  let list = lastGaransi;
+  if (ds) list = list.filter(g => wibDateStr(g.tgl) >= ds);
+  if (de) list = list.filter(g => wibDateStr(g.tgl) <= de);
+  if (q) list = list.filter(g => [g.invoice, g.imei, g.pelanggan, g.produk].join(' ').toLowerCase().includes(q));
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (garansiPage > totalPages) garansiPage = totalPages;
+  const startIdx = (garansiPage - 1) * PAGE_SIZE;
+  const pageList = list.slice(startIdx, startIdx + PAGE_SIZE);
+  let rows = pageList.length ? pageList.map(g => {
     const active = new Date(g.exp) >= new Date();
     return `<tr><td style="padding:12px;font-size:12px;font-weight:700;">${esc(g.invoice)}</td>
       <td style="padding:12px;font-size:12px;">${tglID(g.tgl)}</td>
@@ -1618,6 +1643,12 @@ function renderGaransiTable() {
       <td style="padding:12px;font-size:12px;">${g.masaGaransi} bulan</td>
       <td style="padding:12px;font-size:12px;color:${active ? '#0a0' : '#dc3545'};font-weight:700;">${tglID(g.exp)} ${active ? '(Aktif)' : '(Habis)'}</td></tr>`;
   }).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Tidak ada data garansi</td></tr>';
+  rows += `<tr><td colspan="7" style="text-align:center; padding:12px; border-top:1px solid #eee;">
+    <button class="btn-action" ${garansiPage <= 1 ? 'disabled' : ''} onclick="garansiPage--;renderGaransiTable()">‹ Sebelumnya</button>
+    <span style="margin:0 12px; font-size:13px; font-weight:600;">Hal ${garansiPage} / ${totalPages} • ${list.length} data</span>
+    <button class="btn-action" ${garansiPage >= totalPages ? 'disabled' : ''} onclick="garansiPage++;renderGaransiTable()">Berikutnya ›</button>
+  </td></tr>`;
+  $('garansiTable').innerHTML = rows;
 }
 
 /* ================= KONSINYASI ================= */
@@ -1945,14 +1976,13 @@ function handleScannedCode(code, target) {
 /* ================= KEYBOARD SHORTCUT ================= */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['modalProduk','modalKonsinyasiKeluar','modalStok','modalOpname','modalFinansial','modalPromptText','modalVariant','modalImei','modalScanner','modalConfirm','modalStruk','modalTukarTambah','modalHppMassal','modalHppBaru','modalTambahMassal'].forEach(id => {
+    ['modalProduk','modalKonsinyasiKeluar','modalStok','modalOpname','modalFinansial','modalPromptText','modalVariant','modalImei','modalScanner','modalConfirm','modalStruk','modalTukarTambah','modalHppMassal','modalHppBaru','modalTambahMassal','modalTrxMassal'].forEach(id => {
       const el = $(id); if (el && el.style.display === 'flex') closeModal(id);
     });
   }
   if (e.ctrlKey && e.key.toLowerCase() === 'd') { e.preventDefault(); const di = $('diskonInput'); if (di) { di.focus(); di.select(); } }
   if (e.key === 'Enter' && !e.ctrlKey) {
     const ae = document.activeElement;
-    if (ae && (ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA' || ae.id === 'searchProduk')) return;
     const modalOpen = [...document.querySelectorAll('.modal-overlay')].some(m => m.style.display === 'flex');
     if (modalOpen) return;
     if ($('view-pos').classList.contains('active') && keranjang.length && !$('btnCheckout').disabled) processCheckout();
@@ -1967,14 +1997,15 @@ document.addEventListener('keydown', e => {
       div.innerHTML = `<div class="modal-content" style="max-width:520px;"><h3>Isi HPP Massal</h3>
         <p style="font-size:12px; color:#666; margin-bottom:10px;">Isi cepat: masukkan persentase dari harga jual (cth: 90 = HPP 90% dari harga jual), lalu terapkan.</p>
         <label style="font-size:13px; display:block; margin-bottom:6px; color:#333;">HPP = berapa % dari harga jual?</label>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
           <input type="text" id="hppPercentInput" inputmode="numeric" placeholder="cth: 90" style="flex:1; min-width:110px; padding:10px; border:1px solid #ddd; border-radius:8px;">
           <button class="btn-action" style="height:42px;" onclick="applyHppPercent(false)">Terapkan ke Semua</button>
           <button class="btn-action" style="height:42px;" onclick="applyHppPercent(true)">Hanya yang Kosong</button>
         </div>
-        <div class="table-scroll" style="border:1px solid #eee; border-radius:8px; margin-bottom:15px;">
+        <input type="text" id="hppSearch" placeholder="🔍 Cari produk..." oninput="hppSearchFilter()" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-bottom:10px;">
+        <div style="max-height:300px; overflow-y:auto; border:1px solid #eee; border-radius:8px;">
           <table class="data-table" style="min-width:430px;">
-            <thead><tr><th>Produk</th><th style="text-align:right;">Harga Jual</th><th>HPP (Modal)</th></tr></thead>
+            <thead><tr><th style="position:sticky; top:0; background:#fafafa; z-index:1;">Produk</th><th style="position:sticky; top:0; background:#fafafa; z-index:1; text-align:right;">Harga Jual</th><th style="position:sticky; top:0; background:#fafafa; z-index:1;">HPP (Modal)</th></tr></thead>
             <tbody id="hppListBaru"></tbody>
           </table>
         </div>
@@ -1983,24 +2014,32 @@ document.addEventListener('keydown', e => {
       document.body.appendChild(div);
     }
     $('hppListBaru').innerHTML = allProduk.length ? allProduk.map(p => `
-      <tr>
+      <tr data-pnama="${esc((p.nama + ' ' + (p.varian || '') + ' ' + (p.storage || '')).toLowerCase())}">
         <td style="font-size:13px;"><b>${esc(p.nama)}</b>${p.varian ? ' ' + esc(p.varian) : ''}${p.storage ? ' <span style="color:#999;">' + esc(p.storage) + '</span>' : ''}</td>
         <td style="text-align:right; font-size:13px;">${num(p.harga)}</td>
         <td><input type="text" class="hpp-input-baru" data-id="${p.id}" data-harga="${p.harga}" value="${p.hargaModal ? num(p.hargaModal) : ''}" oninput="formatRupiah(this)" placeholder="0" style="width:110px; padding:8px; border:1px solid #ddd; border-radius:8px; text-align:right;"></td>
       </tr>`).join('') : '<tr><td colspan="3" style="text-align:center; color:#999;">Belum ada produk</td></tr>';
-    $('hppPercentInput').value = '';
+    $('hppPercentInput').value = ''; $('hppSearch').value = '';
     openModal('modalHppBaru');
   } catch (e) { toast('Error: ' + e.message, true); }
+}
+function hppSearchFilter() {
+  const q = ($('hppSearch').value || '').toLowerCase().trim();
+  document.querySelectorAll('#hppListBaru tr').forEach(tr => {
+    if (!tr.dataset.pnama) return;
+    tr.style.display = (!q || tr.dataset.pnama.includes(q)) ? '' : 'none';
+  });
 }
 function applyHppPercent(onlyEmpty) {
   const pct = parseNum($('hppPercentInput').value);
   if (pct <= 0) { toast('Isi persentase dulu (cth: 90)', true); return; }
   document.querySelectorAll('#hppListBaru .hpp-input-baru').forEach(inp => {
+    if (inp.closest('tr').style.display === 'none') return;
     if (onlyEmpty && inp.value.trim()) return;
     const harga = Number(inp.dataset.harga) || 0;
     inp.value = num(Math.round(harga * pct / 100));
   });
-  toast('HPP ' + pct + '% diterapkan' + (onlyEmpty ? ' ke yang kosong' : ' ke semua produk'));
+  toast('HPP ' + pct + '% diterapkan');
 }
 async function submitHppBaru() {
   const inputs = [...document.querySelectorAll('#hppListBaru .hpp-input-baru')];
@@ -2060,7 +2099,7 @@ async function submitTambahMassal() {
 }
 
 /* ================= TRANSAKSI MASSAL (NOTA MANUAL) ================= */
-let tmItems = [], tmStaged = [];
+let tmItems = [], tmStaged = [], tmSelected = null;
 function openTrxMassal() {
   try {
     if (!$('modalTrxMassal')) {
@@ -2068,7 +2107,7 @@ function openTrxMassal() {
       div.className = 'modal-overlay'; div.id = 'modalTrxMassal';
       div.innerHTML = `<div class="modal-content" style="max-width:520px;">
         <h3>Input Transaksi Massal (Nota Manual)</h3>
-        <p style="font-size:12px; color:#666; margin-bottom:12px;">Untuk memasukkan transaksi lama yang tercatat di nota kertas. Isi 1 nota → tekan <b>"+ Simpan ke Daftar"</b>, ulangi untuk nota berikutnya, lalu tekan <b>"Simpan Semua"</b>.</p>
+        <p style="font-size:12px; color:#666; margin-bottom:12px;">Isi 1 nota → tekan <b>"+ Simpan ke Daftar"</b>, ulangi untuk nota berikutnya, lalu <b>"Simpan Semua"</b>.</p>
         <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px;">
           <input type="checkbox" id="tmKurangiStok" checked> Kurangi stok produk sesuai item
         </label>
@@ -2078,8 +2117,10 @@ function openTrxMassal() {
           <div style="flex:2; min-width:150px;"><label style="font-size:11px; color:#666;">Customer (opsional)</label><input type="text" id="tmPelanggan" placeholder="Nama customer" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px;"></div>
         </div>
         <div style="border:1px solid #eee; padding:10px; border-radius:8px; margin-bottom:10px;">
-          <label style="font-size:12px; color:#666;">Tambah Item</label>
-          <select id="tmProduk" onchange="tmOnProductChange()" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; margin-bottom:8px;"></select>
+          <label style="font-size:12px; color:#666;">Tambah Item (ketik untuk cari produk)</label>
+          <input type="text" id="tmSearch" placeholder="🔍 Ketik nama produk..." oninput="tmFilterProducts()" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; margin-bottom:6px;">
+          <div id="tmSearchResults" style="max-height:150px; overflow-y:auto; border:1px solid #eee; border-radius:8px; margin-bottom:8px;"></div>
+          <div id="tmSelectedInfo" style="font-size:12px; color:#666; margin-bottom:8px;">Belum pilih produk</div>
           <div style="display:flex; gap:8px;">
             <div id="tmQtyWrap" style="flex:1;"><input type="number" id="tmQty" value="1" min="1" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px;" placeholder="Qty"></div>
             <div id="tmImeiWrap" class="hidden" style="flex:2;"><select id="tmImei" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:8px;"></select></div>
@@ -2100,29 +2141,46 @@ function openTrxMassal() {
       </div>`;
       document.body.appendChild(div);
     }
-    tmItems = []; tmStaged = [];
+    tmItems = []; tmStaged = []; tmSelected = null;
     $('tmTanggal').value = todayStr();
     const now = new Date();
     $('tmJam').value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
     $('tmPelanggan').value = ''; $('tmTotal').value = '';
-    tmRenderItems(); tmRenderStaged(); tmFillProducts();
+    $('tmSearch').value = '';
+    tmRenderItems(); tmRenderStaged(); tmFilterProducts(); tmUpdateSelectedInfo();
     openModal('modalTrxMassal');
   } catch (e) { toast('Error: ' + e.message, true); }
 }
-function tmFillProducts() {
-  $('tmProduk').innerHTML = allProduk.map(p => `<option value="${p.id}">${esc(p.nama + ' ' + (p.varian || '') + (p.storage ? ' ' + p.storage : ''))} — Rp${num(p.harga)} (Stok: ${stokOf(p)})</option>`).join('');
-  tmOnProductChange();
+function tmFilterProducts() {
+  const q = ($('tmSearch').value || '').toLowerCase().trim();
+  let list = allProduk;
+  if (q) list = allProduk.filter(p => (p.nama + ' ' + (p.varian || '') + ' ' + (p.storage || '')).toLowerCase().includes(q));
+  const shown = list.slice(0, 25);
+  $('tmSearchResults').innerHTML = shown.length ? shown.map(p => `
+    <div onclick="tmPickProduct('${p.id}')" style="padding:7px 10px; border-bottom:1px solid #f5f5f5; cursor:pointer; font-size:12px; display:flex; justify-content:space-between; gap:8px;">
+      <span>${esc(p.nama + ' ' + (p.varian || '') + (p.storage ? ' ' + p.storage : ''))}</span>
+      <span style="white-space:nowrap; color:#666;">Rp${num(p.harga)} • Stok ${stokOf(p)}</span>
+    </div>`).join('') : '<p style="text-align:center; color:#999; font-size:12px; padding:8px;">Produk tidak ketemu</p>';
 }
-function tmOnProductChange() {
-  const p = allProduk.find(x => x.id === $('tmProduk').value);
-  const isImei = p && p.imeis && p.imeis.length > 0;
+function tmPickProduct(id) {
+  tmSelected = allProduk.find(p => p.id === id) || null;
+  tmUpdateSelectedInfo();
+  const isImei = tmSelected && tmSelected.imeis && tmSelected.imeis.length > 0;
   $('tmImeiWrap').classList.toggle('hidden', !isImei);
   $('tmQtyWrap').classList.toggle('hidden', isImei);
-  if (isImei) $('tmImei').innerHTML = p.imeis.map(im => `<option value="${esc(im.imei)}">${esc(im.imei)}</option>`).join('');
+  if (isImei) $('tmImei').innerHTML = tmSelected.imeis.map(im => `<option value="${esc(im.imei)}">${esc(im.imei)}</option>`).join('');
+  $('tmSearch').value = '';
+  tmFilterProducts();
+}
+function tmClearPick() { tmSelected = null; tmUpdateSelectedInfo(); }
+function tmUpdateSelectedInfo() {
+  $('tmSelectedInfo').innerHTML = tmSelected
+    ? `Dipilih: <b>${esc(tmSelected.nama + ' ' + (tmSelected.varian || ''))}</b> — Rp${num(tmSelected.harga)} (Stok: ${stokOf(tmSelected)}) <span style="color:#dc3545; cursor:pointer;" onclick="tmClearPick()">✕ ganti</span>`
+    : 'Belum pilih produk';
 }
 function tmAddItem() {
-  const p = allProduk.find(x => x.id === $('tmProduk').value);
-  if (!p) { toast('Pilih produk dulu', true); return; }
+  if (!tmSelected) { toast('Pilih produk dulu dari hasil pencarian', true); return; }
+  const p = tmSelected;
   const isImei = p.imeis && p.imeis.length > 0;
   const imei = isImei ? $('tmImei').value : null;
   const qty = isImei ? 1 : Math.max(1, Number($('tmQty').value) || 1);
@@ -2213,6 +2271,201 @@ async function tmSaveAll() {
     await loadProduk(); loadRiwayat();
   } catch (e) { toast(e.message, true); }
   btn.disabled = false; btn.textContent = 'Simpan Semua ke Riwayat';
+}
+/* ============================================================
+   PATCH: RIWAYAT + GARANSI (pagination 50) + PRINTER ANTI-PUTUS
+   Tempel di paling bawah script, sebelum INIT. Jangan dobel.
+   ============================================================ */
+var PAGE_SIZE = 50, riwayatPage = 1, garansiPage = 1;
+var bleDevice = null, usbIfaceNum = null;
+
+/* ---------- RIWAYAT TRANSAKSI ---------- */
+function resetRiwayatFilterToday() { const t = todayStr(); $('riwayatDateStart').value = t; $('riwayatDateEnd').value = t; riwayatPage = 1; loadRiwayat(); }
+function riwayatBulanIni() {
+  const d = new Date(Date.now() + 7 * 3600 * 1000);
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0');
+  $('riwayatDateStart').value = y + '-' + m + '-01';
+  $('riwayatDateEnd').value = todayStr();
+  riwayatPage = 1; loadRiwayat();
+}
+function riwayatSearchChanged() { riwayatPage = 1; renderRiwayatTable(); }
+async function loadRiwayat() {
+  try {
+    if (!$('btnTrxMassal')) {
+      const hdr = document.querySelector('#view-riwayat .dashboard-header > div:last-child');
+      if (hdr) {
+        const b = document.createElement('button');
+        b.id = 'btnTrxMassal'; b.className = 'btn-add';
+        b.style.cssText = 'margin:0; height:42px;';
+        b.textContent = '+ Transaksi Massal';
+        b.onclick = function() { if (typeof openTrxMassal === 'function') openTrxMassal(); else toast('Blok Transaksi Massal belum terpasang', true); };
+        hdr.appendChild(b);
+      }
+    }
+  } catch (e) {}
+  try {
+    const { start, end } = getRangeWib($('riwayatDateStart').value, $('riwayatDateEnd').value);
+    const { data, error } = await supabase.from('transaksi').select('*').gte('tgl', start).lte('tgl', end).order('tgl', { ascending: false });
+    if (error) throw error;
+    lastRiwayat = (data || []).map(row => ({
+      id: row.id, tgl: row.tgl, pelanggan: row.pelanggan,
+      items: row.items ? String(row.items).split(', ') : [],
+      items_json: row.items_json || null, rincian_bayar: row.rincian_bayar || null,
+      kasir: row.kasir || null, total: Number(row.total) || 0, hpp: Number(row.hpp) || 0,
+      metode: row.metode, diskon: row.diskon,
+      tt_nama: row.tt_nama, tt_imei: row.tt_imei, tt_nilai: row.tt_nilai || 0
+    }));
+    renderRiwayatTable();
+  } catch (e) { toast('Gagal memuat riwayat: ' + e.message, true); }
+}
+function renderRiwayatTable() {
+  const q = (($('riwayatSearch') || {}).value || '').toLowerCase().trim();
+  let list = lastRiwayat;
+  if (q) list = lastRiwayat.filter(r => {
+    const imeis = (r.items_json || []).map(x => x.imei || '').join(' ');
+    const itemsStr = (r.items || []).join(' ');
+    return [r.id, r.pelanggan || '', r.metode || '', r.kasir || '', itemsStr, imeis].join(' ').toLowerCase().includes(q);
+  });
+  const totPen = list.reduce((s, r) => s + r.total, 0), totHpp = list.reduce((s, r) => s + r.hpp, 0);
+  $('riwayatTotalPenjualan').textContent = fmt(totPen);
+  $('riwayatTotalHpp').textContent = fmt(totHpp);
+  $('riwayatTotalLaba').textContent = fmt(totPen - totHpp);
+  $('riwayatJumlahTrx').textContent = list.length;
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (riwayatPage > totalPages) riwayatPage = totalPages;
+  const startIdx = (riwayatPage - 1) * PAGE_SIZE;
+  const pageList = list.slice(startIdx, startIdx + PAGE_SIZE);
+  let rows = pageList.length ? pageList.map(r => `
+      <tr>
+        <td style="padding:12px;font-weight:700;font-size:12px;">${esc(r.id)}</td>
+        <td style="padding:12px;font-size:12px;">${tglID(r.tgl, true)}</td>
+        <td style="padding:12px;font-size:12px;">${esc(r.pelanggan || '-')}</td>
+        <td style="padding:12px;font-size:12px;max-width:260px;">${(r.items || []).map(i => esc(i)).join('<br>')}</td>
+        <td style="padding:12px;font-size:12px;font-weight:700;">${fmt(r.total)}</td>
+        <td style="padding:12px;font-size:12px;">${esc(r.metode || '-')}${r.tt_nilai > 0 ? `<br><span style="font-size:11px;color:#666;">TT: ${fmt(r.tt_nilai)}</span>` : ''}</td>
+        <td style="padding:12px;white-space:nowrap;"><button class="btn-action" onclick="showStrukFromTrxById('${r.id}')">Struk</button>${currentUser.role === 'admin' ? `<button class="btn-action danger" onclick="hapusTrx('${r.id}')">Hapus</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Tidak ada transaksi</td></tr>';
+  rows += `<tr><td colspan="7" style="text-align:center; padding:12px; border-top:1px solid #eee;">
+    <button class="btn-action" ${riwayatPage <= 1 ? 'disabled' : ''} onclick="riwayatPage--;renderRiwayatTable()">‹ Sebelumnya</button>
+    <span style="margin:0 12px; font-size:13px; font-weight:600;">Hal ${riwayatPage} / ${totalPages} • ${list.length} data</span>
+    <button class="btn-action" ${riwayatPage >= totalPages ? 'disabled' : ''} onclick="riwayatPage++;renderRiwayatTable()">Berikutnya ›</button>
+  </td></tr>`;
+  $('riwayatTrxTable').innerHTML = rows;
+}
+
+/* ---------- GARANSI ---------- */
+function garansiHariIni() { const t = todayStr(); $('garansiDateStart').value = t; $('garansiDateEnd').value = t; garansiPage = 1; renderGaransiTable(); }
+function garansiBulanIni() {
+  const d = new Date(Date.now() + 7 * 3600 * 1000);
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0');
+  $('garansiDateStart').value = y + '-' + m + '-01';
+  $('garansiDateEnd').value = todayStr();
+  garansiPage = 1; renderGaransiTable();
+}
+function renderGaransiTable() {
+  const q = (($('searchGaransi') || {}).value || '').toLowerCase().trim();
+  const ds = (($('garansiDateStart') || {}).value || ''), de = (($('garansiDateEnd') || {}).value || '');
+  let list = lastGaransi;
+  if (ds) list = list.filter(g => wibDateStr(g.tgl) >= ds);
+  if (de) list = list.filter(g => wibDateStr(g.tgl) <= de);
+  if (q) list = list.filter(g => [g.invoice, g.imei, g.pelanggan, g.produk].join(' ').toLowerCase().includes(q));
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (garansiPage > totalPages) garansiPage = totalPages;
+  const startIdx = (garansiPage - 1) * PAGE_SIZE;
+  const pageList = list.slice(startIdx, startIdx + PAGE_SIZE);
+  let rows = pageList.length ? pageList.map(g => {
+    const active = new Date(g.exp) >= new Date();
+    return `<tr><td style="padding:12px;font-size:12px;font-weight:700;">${esc(g.invoice)}</td>
+      <td style="padding:12px;font-size:12px;">${tglID(g.tgl)}</td>
+      <td style="padding:12px;font-size:12px;">${esc(g.pelanggan || '-')}</td>
+      <td style="padding:12px;font-size:12px;">${esc(g.produk)}</td>
+      <td style="padding:12px;font-size:12px;font-family:monospace;">${esc(g.imei || '-')}</td>
+      <td style="padding:12px;font-size:12px;">${g.masaGaransi} bulan</td>
+      <td style="padding:12px;font-size:12px;color:${active ? '#0a0' : '#dc3545'};font-weight:700;">${tglID(g.exp)} ${active ? '(Aktif)' : '(Habis)'}</td></tr>`;
+  }).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">Tidak ada data garansi</td></tr>';
+  rows += `<tr><td colspan="7" style="text-align:center; padding:12px; border-top:1px solid #eee;">
+    <button class="btn-action" ${garansiPage <= 1 ? 'disabled' : ''} onclick="garansiPage--;renderGaransiTable()">‹ Sebelumnya</button>
+    <span style="margin:0 12px; font-size:13px; font-weight:600;">Hal ${garansiPage} / ${totalPages} • ${list.length} data</span>
+    <button class="btn-action" ${garansiPage >= totalPages ? 'disabled' : ''} onclick="garansiPage++;renderGaransiTable()">Berikutnya ›</button>
+  </td></tr>`;
+  $('garansiTable').innerHTML = rows;
+}
+
+/* ---------- PRINTER ANTI-PUTUS (auto reconnect) ---------- */
+async function ensureBle() {
+  if (!bleDevice) throw new Error('Printer Bluetooth belum pernah terhubung. Hubungkan dulu di menu Printer.');
+  if (bleDevice.gatt.connected && bleChar) return;
+  $('bleStatus').textContent = 'Status: Menyambung ulang otomatis...';
+  const server = await bleDevice.gatt.connect();
+  const svc = await server.getPrimaryService(BLE_SERVICE);
+  bleChar = await svc.getCharacteristic(BLE_CHAR);
+  $('bleStatus').textContent = 'Status: Terhubung — ' + (bleDevice.name || 'Printer BLE');
+}
+async function ensureUsb() {
+  if (!usbDevice) throw new Error('Printer USB belum terhubung. Hubungkan dulu di menu Printer.');
+  if (usbDevice.opened) return;
+  await usbDevice.open();
+  if (usbDevice.configuration === null) await usbDevice.selectConfiguration(1);
+  const iface = usbDevice.configuration.interfaces.find(i => i.alternates[0].interfaceClass === 7) || usbDevice.configuration.interfaces[0];
+  await usbDevice.claimInterface(iface.interfaceNumber);
+  usbIfaceNum = iface.interfaceNumber;
+  usbEndpoint = iface.alternates[0].endpoints.find(e => e.direction === 'out') || null;
+}
+async function printStrukEscPos() {
+  if (!currentStruk) { toast('Tidak ada struk', true); return; }
+  const bytes = escposBytes(buildStrukText(currentStruk));
+  try {
+    if (bleDevice) { await ensureBle(); await blePrint(bytes); }
+    else if (usbDevice) { await ensureUsb(); await usbPrint(bytes); }
+    else toast('Hubungkan printer dulu di menu Printer', true);
+  } catch (e) { toast('Gagal print: ' + e.message, true); }
+}
+async function connectUsbPrinter() {
+  if (!navigator.usb) { toast('WebUSB tidak didukung (pakai Chrome/Edge)', true); return; }
+  try {
+    const d = await navigator.usb.requestDevice({ filters: [{ classCode: 7 }] });
+    await d.open();
+    if (d.configuration === null) await d.selectConfiguration(1);
+    const iface = d.configuration.interfaces.find(i => i.alternates[0].interfaceClass === 7) || d.configuration.interfaces[0];
+    await d.claimInterface(iface.interfaceNumber);
+    usbDevice = d; usbIfaceNum = iface.interfaceNumber;
+    usbEndpoint = iface.alternates[0].endpoints.find(e => e.direction === 'out') || null;
+    $('usbStatus').textContent = 'Status: Terhubung — ' + (d.productName || 'Printer USB');
+    toast('Printer USB terhubung');
+    d.addEventListener('disconnect', () => {
+      usbDevice = null; usbEndpoint = null;
+      $('usbStatus').textContent = 'Status: Terputus — colok ulang lalu hubungkan lagi';
+      toast('Printer USB terputus', true);
+    });
+  } catch (e) { $('usbStatus').textContent = 'Status: Gagal — ' + e.message; }
+}
+async function connectBlePrinter() {
+  if (!navigator.bluetooth) { toast('Web Bluetooth tidak didukung (pakai Chrome + HTTPS)', true); return; }
+  try {
+    let device;
+    try { device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE_SERVICE] }] }); }
+    catch (e) { device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [BLE_SERVICE] }); }
+    bleDevice = device;
+    device.addEventListener('gattserverdisconnected', () => {
+      bleChar = null;
+      $('bleStatus').textContent = 'Status: Terputus — auto sambung ulang saat print';
+      toast('Printer terputus, otomatis disambung ulang saat print', true);
+    });
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(BLE_SERVICE);
+    bleChar = await svc.getCharacteristic(BLE_CHAR);
+    $('bleStatus').textContent = 'Status: Terhubung — ' + (device.name || 'Printer BLE');
+    toast('Printer Bluetooth terhubung');
+  } catch (e) { $('bleStatus').textContent = 'Status: Gagal — ' + e.message; }
+}
+async function testPrint() {
+  const t = { id: 'TEST-PRINT', tgl: new Date().toISOString(), kasir: currentUser ? currentUser.username : 'Test', pelanggan: 'Pelanggan Uji', items: [{ nama: 'Produk Uji Cetak', varian: '', storage: '', imei: '', qty: 1, harga: 123456 }], total: 123456, metode: 'Cash', diskon: '0', diterima: 150000, kembalian: 26544 };
+  const bytes = escposBytes(buildStrukText(t));
+  try {
+    if (bleDevice) { await ensureBle(); await blePrint(bytes); }
+    else if (usbDevice) { await ensureUsb(); await usbPrint(bytes); }
+    else toast('Hubungkan printer dulu', true);
+  } catch (e) { toast(e.message, true); }
 }
   
 /* ================= INIT ================= */
