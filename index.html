@@ -656,8 +656,9 @@ function toggleSidebar() {
   $('sidebarOverlay').classList.toggle('active', !$('sidebar').classList.contains('collapsed'));
 }
 function switchView(id) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const v = $('view-' + id); if (v) v.classList.add('active');
+  document.querySelectorAll('.view').forEach(v => { v.classList.remove('active'); v.style.display = 'none'; });
+  const v = $('view-' + id);
+  if (v) { v.classList.add('active'); v.style.display = 'block'; }
   document.querySelectorAll('.menu-item').forEach(mi => mi.classList.toggle('active', mi.dataset.view === id));
   const m = MENU.find(x => x.id === id); $('pageTitle').textContent = m ? m.label : id;
   if (window.innerWidth <= 900 && !$('sidebar').classList.contains('collapsed')) toggleSidebar();
@@ -802,7 +803,7 @@ function renderProdukGrid() {
     const totalStok = g.items.reduce((s, p) => s + stokOf(p), 0);
     const first = g.items[0];
     return `<div class="product-card" onclick="pilihProdukGroup(${i})">
-      <div class="product-img-box">${first.foto ? `<img src="${esc(first.foto)}" loading="lazy">` : '<span style="font-size:26px;">📦</span>'}</div>
+     <div class="product-img-box">${first.foto ? `<img src="${esc(first.foto)}" loading="lazy">` : '<svg viewBox="0 0 24 24" width="34" height="34" fill="#dcdcdc"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>'}</div>
       <div class="p-info">
         <div class="p-name">${esc(g.nama)}</div>
         <div class="p-var">${esc(g.varian || '-')}${g.items.length > 1 ? ' • ' + g.items.length + ' varian' : ''}</div>
@@ -865,7 +866,7 @@ function renderKeranjang() {
   if (!keranjang.length) c.innerHTML = '<div style="text-align:center;color:#999;margin-top:50px;">Keranjang kosong</div>';
   else c.innerHTML = keranjang.map((k, idx) => `
     <div class="cart-item">
-      ${k.foto ? `<img src="${esc(k.foto)}">` : '<div style="width:50px;height:50px;background:#f9f9f9;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📦</div>'}
+      ${k.foto ? `<img src="${esc(k.foto)}">` : '<div style="width:50px;height:50px;background:#f9f9f9;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="22" height="22" fill="#dcdcdc"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>'}
       <div class="ci-details">
         <h5>${esc(k.nama)}</h5>
         <p>${esc([k.varian, k.storage, k.imei ? 'IMEI: ' + k.imei : ''].filter(Boolean).join(' • '))}</p>
