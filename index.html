@@ -2500,6 +2500,46 @@ function renderChart(labels, data) {
   } catch (e) {}
 }
 window.addEventListener('resize', () => { if (salesChart) salesChart.resize(); });
+
+/* ============ PATCH: HALAMAN PRODUK (CARI + PAGINATION 100) ============ */
+var produkPage = 1;
+const PRODUK_PAGE_SIZE = 100;
+function renderProdukPage() {
+  $('btnAddProdukContainer').innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:20px;">
+      <button class="btn-add" style="margin:0;" onclick="openTambahProduk()">+ Tambah Produk</button>
+      <button class="btn-add" style="margin:0; background:#fff; color:#000; border:1px solid #000;" onclick="openHppBaru()">Update HPP Massal</button>
+      <button class="btn-add" style="margin:0; background:#fff; color:#000; border:1px solid #000;" onclick="openTambahMassal()">+ Tambah Massal</button>
+      <input type="text" id="produkSearch" class="search-box" style="flex:1; min-width:200px; margin-bottom:0;" placeholder="🔍 Cari nama / varian / storage / kategori..." oninput="produkPage=1;renderProdukTable()">
+    </div>`;
+  renderProdukTable();
+}
+function renderProdukTable() {
+  const q = (($('produkSearch') || {}).value || '').toLowerCase().trim();
+  let list = allProduk;
+  if (q) list = allProduk.filter(p =>
+    [p.nama, p.varian, p.storage, p.kategori].join(' ').toLowerCase().includes(q));
+  const totalPages = Math.max(1, Math.ceil(list.length / PRODUK_PAGE_SIZE));
+  if (produkPage > totalPages) produkPage = totalPages;
+  const startIdx = (produkPage - 1) * PRODUK_PAGE_SIZE;
+  const pageList = list.slice(startIdx, startIdx + PRODUK_PAGE_SIZE);
+  const tb = $('tableProduk');
+  let rows = pageList.length ? pageList.map(p => `
+    <tr>
+      <td>${p.foto ? `<img src="${esc(p.foto)}">` : '—'}</td>
+      <td><b>${esc(p.nama)}</b></td>
+      <td>${esc(p.varian || '-')}</td><td>${esc(p.storage || '-')}</td><td>${esc(p.kategori)}</td>
+      <td>${fmt(p.harga)}${p.isKonsinyasi ? `<br><span style="font-size:11px;color:#666;">Setoran: ${fmt(p.hargaSetoran)}</span>` : ''}</td>
+      <td><b>${stokOf(p)}</b>${p.imeis && p.imeis.length ? `<br><span style="font-size:11px;color:#666;">${p.imeis.length} IMEI</span>` : ''}</td>
+      <td><button class="btn-action" onclick="openEditProduk('${p.id}')">Edit</button><button class="btn-action danger" onclick="hapusProduk('${p.id}')">Hapus</button></td>
+    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px;">' + (q ? 'Produk tidak ditemukan' : 'Belum ada produk') + '</td></tr>';
+  rows += `<tr><td colspan="8" style="text-align:center; padding:12px; border-top:1px solid #eee;">
+    <button class="btn-action" ${produkPage <= 1 ? 'disabled' : ''} onclick="produkPage--;renderProdukTable()">‹ Sebelumnya</button>
+    <span style="margin:0 12px; font-size:13px; font-weight:600;">Hal ${produkPage} / ${totalPages} • ${list.length} produk</span>
+    <button class="btn-action" ${produkPage >= totalPages ? 'disabled' : ''} onclick="produkPage++;renderProdukTable()">Berikutnya ›</button>
+  </td></tr>`;
+  tb.innerHTML = rows;
+}
   
 /* ================= INIT ================= */
 document.addEventListener('DOMContentLoaded', () => {
