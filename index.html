@@ -129,6 +129,32 @@ body { background-color: var(--main-bg); color: var(--text-dark); }
 /* Fix grafik keluar kotak */
 .chart-container { position: relative; overflow: hidden; }
 .chart-container canvas { max-width: 100% !important; max-height: 100% !important; }
+
+ /* ===== PATCH: FREEZE JUDUL TAB + HEADER TABEL ===== */
+/* Judul + filter tiap tab ikut nempel saat scroll */
+.view > .dashboard-header {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--main-bg);
+  padding: 10px 0 12px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+/* Baris tombol + cari di tab Produk */
+#view-produk > #btnAddProdukContainer {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--main-bg);
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+#btnAddProdukContainer > div { margin-bottom: 0 !important; }
+/* Header tabel beku + tabel scroll di dalam kotaknya */
+.table-scroll { max-height: calc(100dvh - 250px); overflow-y: auto; }
+.table-scroll thead th {
+  position: sticky; top: 0; z-index: 5;
+  background: #fafafa;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+@media (max-width: 900px) { .table-scroll { max-height: calc(100dvh - 210px); } }                          
                            
   </style>
 </head>
