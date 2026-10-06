@@ -635,8 +635,8 @@ const ICONS = {
   pengaturan: '<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>'
 };
 const MENU = [
-  { id: 'pos', label: 'POS / Kasir', icon: ICONS.pos },
   { id: 'dashboard', label: 'Dashboard', icon: ICONS.dashboard, admin: true },
+  { id: 'pos', label: 'POS / Kasir', icon: ICONS.pos },
   { id: 'produk', label: 'Produk', icon: ICONS.produk, admin: true },
   { id: 'stok', label: 'Stok & Opname', icon: ICONS.stok, admin: true },
   { id: 'riwayat', label: 'Riwayat Transaksi', icon: ICONS.riwayat },
@@ -936,13 +936,16 @@ function toggleSplitPayment() {
 function renderSplitRows() {
   $('splitPaymentArea').innerHTML = splitPayments.map((sp, i) => `
     <div style="display:flex;gap:6px;margin-bottom:6px;">
-      <select onchange="splitPayments[${i}].metode=this.value" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;">${METODE_OPTS.map(m => `<option ${m === sp.metode ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <select onchange="splitPayments[${i}].metode=this.value;splitPayments[${i}].nama='';renderSplitRows();" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;">${METODE_OPTS.map(m => `<option ${m === sp.metode ? 'selected' : ''}>${m}</option>`).join('')}</select>
       <input type="text" value="${sp.jumlah ? num(sp.jumlah) : ''}" oninput="formatRupiah(this);splitPayments[${i}].jumlah=parseNum(this.value);updateSplitSum();" style="width:110px;text-align:right;padding:8px;border:1px solid #ddd;border-radius:8px;" placeholder="Rp">
       <button class="qty-btn" style="width:34px;height:auto;" onclick="removeSplit(${i})">✕</button>
-    </div>`).join('') +
-    `<button class="btn-action" style="width:100%;margin-top:4px;" onclick="addSplit()">+ Tambah Metode</button><div id="splitSum" style="font-size:12px;margin-top:6px;"></div>`;
+    </div>` +
+    (sp.metode === 'Cicilan' ? `<input type="text" value="${esc(sp.nama || '')}" oninput="splitPayments[${i}].nama=this.value" placeholder="Nama cicilan (cth: Kredivo, Akulaku)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:6px;">` : '')
+  ).join('') +
+  `<button class="btn-action" style="width:100%;margin-top:4px;" onclick="addSplit()">+ Tambah Metode</button><div id="splitSum" style="font-size:12px;margin-top:6px;"></div>`;
   updateSplitSum();
 }
+  
 function addSplit() { splitPayments.push({ metode: 'QRIS', jumlah: 0 }); renderSplitRows(); }
 function removeSplit(i) { splitPayments.splice(i, 1); if (!splitPayments.length) splitPayments.push({ metode: 'Cash', jumlah: 0 }); renderSplitRows(); }
 function updateSplitSum() {
@@ -958,7 +961,11 @@ function processCheckout() {
   let metode = metodeSel;
   if (metodeSel === 'Cicilan') { const n = $('namaCicilan').value.trim(); metode = n ? 'Cicilan (' + n + ')' : 'Cicilan'; }
   if ($('useSplitPayment').checked) {
-    const sp = splitPayments.filter(p => Number(p.jumlah) > 0).map(p => ({ metode: p.metode, jumlah: Number(p.jumlah) }));
+    const raw = splitPayments.filter(p => Number(p.jumlah) > 0);
+    for (const p of raw) {
+      if (p.metode === 'Cicilan' && !(p.nama || '').trim()) { toast('Isi nama cicilan dulu (cth: Kredivo)', true); return; }
+    }
+    const sp = raw.map(p => ({ metode: p.metode === 'Cicilan' ? 'Cicilan (' + (p.nama || '').trim() + ')' : p.metode, jumlah: Number(p.jumlah) }));
     const sum = sp.reduce((s, p) => s + p.jumlah, 0);
     if (sp.length < 2) { toast('Isi minimal 2 metode pembayaran', true); return; }
     if (sum < total) { toast('Total split (' + fmt(sum) + ') belum mencukupi (' + fmt(total) + ')', true); return; }
@@ -1216,7 +1223,8 @@ async function testPrint() {
 /* ================= HALAMAN PRODUK (ADMIN) ================= */
 function renderProdukPage() {
   $('btnAddProdukContainer').innerHTML = `<button class="btn-add" onclick="openTambahProduk()">+ Tambah Produk</button>
-    <button class="btn-action" style="margin-bottom:20px;" onclick="openHppMassal()">Update HPP Massal</button>`;
+    <button class="btn-action" style="margin-bottom:20px;" onclick="openHppBaru()">Update HPP Massal</button>
+    <button class="btn-action" style="margin-bottom:20px;" onclick="openTambahMassal()">+ Tambah Massal</button>`;
   renderProdukTable();
 }
 function renderProdukTable() {
@@ -1920,7 +1928,7 @@ function handleScannedCode(code, target) {
 /* ================= KEYBOARD SHORTCUT ================= */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['modalProduk','modalKonsinyasiKeluar','modalStok','modalOpname','modalFinansial','modalPromptText','modalVariant','modalImei','modalScanner','modalConfirm','modalStruk','modalTukarTambah','modalHppMassal'].forEach(id => {
+    ['modalProduk','modalKonsinyasiKeluar','modalStok','modalOpname','modalFinansial','modalPromptText','modalVariant','modalImei','modalScanner','modalConfirm','modalStruk','modalTukarTambah','modalHppMassal','modalHppBaru','modalTambahMassal'].forEach(id => {
       const el = $(id); if (el && el.style.display === 'flex') closeModal(id);
     });
   }
@@ -1933,6 +1941,84 @@ document.addEventListener('keydown', e => {
     if ($('view-pos').classList.contains('active') && keranjang.length && !$('btnCheckout').disabled) processCheckout();
   }
 });
+
+  /* ================= HPP MASSAL & TAMBAH MASSAL (BARU) ================= */
+function openHppBaru() {
+  try {
+    if (!$('modalHppBaru')) {
+      const div = document.createElement('div');
+      div.className = 'modal-overlay'; div.id = 'modalHppBaru';
+      div.innerHTML = `<div class="modal-content"><h3>Update HPP Massal</h3>
+        <p style="font-size:12px;color:#666;margin-bottom:10px;">Isi harga modal per produk lalu simpan sekaligus.</p>
+        <div id="hppListBaru" style="max-height:400px;overflow-y:auto;"></div>
+        <button class="btn-save" onclick="submitHppBaru()">Simpan Semua HPP</button>
+        <button class="btn-close-modal" onclick="closeModal('modalHppBaru')">Batal</button></div>`;
+      document.body.appendChild(div);
+    }
+    $('hppListBaru').innerHTML = allProduk.map(p => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+        <div style="flex:1;"><b style="font-size:13px;">${esc(p.nama)} ${esc(p.varian || '')}</b>
+        <div style="font-size:11px;color:#666;">${esc(p.storage || '')} • Jual ${fmt(p.harga)}</div></div>
+        <input type="text" class="hpp-input-baru" data-id="${p.id}" value="${p.hargaModal ? num(p.hargaModal) : ''}" oninput="formatRupiah(this)" placeholder="0" style="width:120px;padding:8px;border:1px solid #ddd;border-radius:8px;text-align:right;">
+      </div>`).join('') || '<p style="text-align:center;color:#999;padding:10px;">Belum ada produk</p>';
+    openModal('modalHppBaru');
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+async function submitHppBaru() {
+  const inputs = [...document.querySelectorAll('#hppListBaru .hpp-input-baru')];
+  try {
+    for (const inp of inputs) {
+      const { error } = await supabase.from('produk').update({ harga_modal: parseNum(inp.value) }).eq('id', inp.dataset.id);
+      if (error) throw error;
+    }
+    toast('Semua HPP tersimpan'); closeModal('modalHppBaru');
+    await loadProduk(); renderProdukTable();
+  } catch (e) { toast(e.message, true); }
+}
+function openTambahMassal() {
+  try {
+    if (!$('modalTambahMassal')) {
+      const div = document.createElement('div');
+      div.className = 'modal-overlay'; div.id = 'modalTambahMassal';
+      div.innerHTML = `<div class="modal-content"><h3>Tambah Produk Massal</h3>
+        <p style="font-size:12px;color:#666;margin-bottom:10px;">1 baris = 1 produk.<br>Format: <b>Nama | Varian | Storage | Kategori | Harga | HPP</b><br>Contoh: <i>Adapter iPhone | - | - | Aksesoris | 100000 | 60000</i><br>Minimal wajib: <b>Nama | Harga</b> — sisanya opsional.</p>
+        <textarea id="tmTextArea" rows="9" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-family:monospace;font-size:12px;" placeholder="Adapter iPhone | - | - | Aksesoris | 100000 | 60000&#10;Kabel Data 1m | Black | - | Aksesoris | 50000 | 25000"></textarea>
+        <button class="btn-save" onclick="submitTambahMassal()">Simpan Semua Produk</button>
+        <button class="btn-close-modal" onclick="closeModal('modalTambahMassal')">Batal</button></div>`;
+      document.body.appendChild(div);
+    }
+    $('tmTextArea').value = '';
+    openModal('modalTambahMassal');
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+async function submitTambahMassal() {
+  const lines = ($('tmTextArea').value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) { toast('Isi dulu daftar produknya', true); return; }
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const c = lines[i].split('|').map(s => s.trim());
+    const nama = c[0] || '';
+    let varian = '', storage = '', kategori = '', harga = 0, hpp = 0;
+    if (c.length >= 5) { varian = c[1]; storage = c[2]; kategori = c[3]; harga = parseNum(c[4]); hpp = parseNum(c[5] || 0); }
+    else if (c.length === 3) { varian = c[1]; harga = parseNum(c[2]); }
+    else if (c.length === 2) { harga = parseNum(c[1]); }
+    else { toast('Baris ' + (i + 1) + ' formatnya salah: ' + lines[i], true); return; }
+    if (!nama || harga <= 0) { toast('Baris ' + (i + 1) + ': nama & harga wajib diisi', true); return; }
+    rows.push({
+      id: 'PRD' + Date.now() + i + Math.floor(Math.random() * 1000),
+      nama, varian: varian === '-' ? '' : varian, storage: storage === '-' ? '' : storage,
+      kategori: (!kategori || kategori === '-') ? 'Lainnya' : kategori,
+      harga, stok: 0, imeis: [], harga_modal: hpp, foto: '',
+      is_konsinyasi: false, mitra_id: null, harga_setoran: 0
+    });
+  }
+  try {
+    const { error } = await supabase.from('produk').insert(rows);
+    if (error) throw error;
+    toast(rows.length + ' produk berhasil ditambahkan'); closeModal('modalTambahMassal');
+    await loadProduk(); renderProdukTable();
+  } catch (e) { toast(e.message, true); }
+}
 
 /* ================= INIT ================= */
 document.addEventListener('DOMContentLoaded', () => {
