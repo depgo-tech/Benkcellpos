@@ -2567,6 +2567,180 @@ function renderProdukTable() {
   </td></tr>`;
   tb.innerHTML = rows;
 }
+/* ============ PATCH: TUKAR TAMBAH DI SPLIT PAYMENT ============ */
+if (!METODE_OPTS.includes('Tukar Tambah')) METODE_OPTS.push('Tukar Tambah');
+function hitungBaseTotal() {
+  const sub = keranjang.reduce((s, k) => s + k.harga * k.qty, 0);
+  const dv = parseNum($('diskonInput').value);
+  let disc = $('diskonType').value === '%' ? sub * dv / 100 : dv;
+  if (disc > sub) disc = sub;
+  return Math.max(0, sub - disc);
+}
+function splitTargetTotal() {
+  const hasTtRow = splitPayments.some(p => p.metode === 'Tukar Tambah' && Number(p.jumlah) > 0);
+  let t = hitungBaseTotal();
+  if (!hasTtRow && $('useTukarTambah').checked && tukarTambah) t = Math.max(0, t - (Number(tukarTambah.nilai) || 0));
+  return t;
+}
+function renderSplitRows() {
+  $('splitPaymentArea').innerHTML = splitPayments.map((sp, i) => `
+    <div style="display:flex;gap:6px;margin-bottom:6px;">
+      <select onchange="splitPayments[${i}].metode=this.value;splitPayments[${i}].nama='';if(this.value==='Tukar Tambah'){$('useTukarTambah').checked=false;tukarTambah=null;hitungTotal();}renderSplitRows();" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;">${METODE_OPTS.map(m => `<option ${m === sp.metode ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <input type="text" value="${sp.jumlah ? num(sp.jumlah) : ''}" oninput="formatRupiah(this);splitPayments[${i}].jumlah=parseNum(this.value);updateSplitSum();" style="width:110px;text-align:right;padding:8px;border:1px solid #ddd;border-radius:8px;" placeholder="${sp.metode === 'Tukar Tambah' ? 'Nilai Tukar' : 'Rp'}">
+      <button class="qty-btn" style="width:34px;height:auto;" onclick="removeSplit(${i})">✕</button>
+    </div>` +
+    (sp.metode === 'Cicilan' ? `<input type="text" value="${esc(sp.nama || '')}" oninput="splitPayments[${i}].nama=this.value" placeholder="Nama cicilan (cth: Kredivo, Akulaku)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:6px;">` : '') +
+    (sp.metode === 'Tukar Tambah' ? `<input type="text" value="${esc(sp.nama || '')}" oninput="splitPayments[${i}].nama=this.value" placeholder="Nama produk tukar tambah (cth: iPhone 7 32GB)" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:6px;">` : '')
+  ).join('') +
+  `<button class="btn-action" style="width:100%;margin-top:4px;" onclick="addSplit()">+ Tambah Metode</button><div id="splitSum" style="font-size:12px;margin-top:6px;"></div>`;
+  updateSplitSum();
+}
+function updateSplitSum() {
+  const el = $('splitSum'); if (!el) return;
+  const sum = splitPayments.reduce((s, p) => s + (Number(p.jumlah) || 0), 0);
+  const target = splitTargetTotal();
+  el.innerHTML = `Terbayar: <b>${fmt(sum)}</b> • Sisa: <b style="color:${target - sum > 0 ? '#dc3545' : '#0a0'}">${fmt(Math.max(0, target - sum))}</b>`;
+}
+function processCheckout() {
+  if (!keranjang.length) return;
+  const metodeSel = $('metodeBayar').value;
+  let metode = metodeSel;
+  if (metodeSel === 'Cicilan') { const n = $('namaCicilan').value.trim(); metode = n ? 'Cicilan (' + n + ')' : 'Cicilan'; }
+  if ($('useSplitPayment').checked) {
+    const raw = splitPayments.filter(p => Number(p.jumlah) > 0);
+    for (const p of raw) {
+      if (p.metode === 'Cicilan' && !(p.nama || '').trim()) { toast('Isi nama cicilan dulu (cth: Kredivo)', true); return; }
+      if (p.metode === 'Tukar Tambah' && !(p.nama || '').trim()) { toast('Isi nama produk tukar tambah dulu', true); return; }
+    }
+    const ttEntry = raw.find(p => p.metode === 'Tukar Tambah');
+    const sp = raw.map(p => ({
+      metode: p.metode === 'Cicilan' ? 'Cicilan (' + (p.nama || '').trim() + ')'
+        : p.metode === 'Tukar Tambah' ? 'Tukar Tambah (' + (p.nama || '').trim() + ')'
+        : p.metode,
+      jumlah: Number(p.jumlah)
+    }));
+    const sum = sp.reduce((s, p) => s + p.jumlah, 0);
+    if (sp.length < 2) { toast('Isi minimal 2 metode pembayaran', true); return; }
+    const target = ttEntry ? hitungBaseTotal() : splitTargetTotal();
+    if (sum < target) { toast('Total split (' + fmt(sum) + ') belum mencukupi (' + fmt(target) + ')', true); return; }
+    doCheckout(
+      sp.map(p => p.metode + ' (' + p.jumlah + ')').join(' + '),
+      sp, sum, sum - target,
+      ttEntry ? { nama: (ttEntry.nama || '').trim(), nilai: Number(ttEntry.jumlah) } : null
+    );
+    return;
+  }
+  const total = currentTotal();
+  if (metodeSel === 'Cash') {
+    openFinansial('Pembayaran Tunai', 'Total: ' + fmt(total) + '\nMasukkan uang diterima (kosongkan jika uang pas):', async v => {
+      const paid = v > 0 ? v : total;
+      if (paid < total) { toast('Uang diterima kurang', true); return; }
+      await doCheckout('Cash', null, paid, paid - total, null);
+    });
+    return;
+  }
+  doCheckout(metode, null, total, 0, null);
+}
+async function doCheckout(metode, splits, diterima, kembalian, ttFromSplit) {
+  const diskonType = $('diskonType').value, diskonVal = parseNum($('diskonInput').value);
+  const diskonStr = diskonVal > 0 ? (diskonType === '%' ? diskonVal + '%' : String(diskonVal)) : '0';
+  const pelanggan = $('namaPelanggan').value.trim();
+  const garansiBulan = Number($('masaGaransi').value) || 0;
+  const ttData = ttFromSplit ? ttFromSplit : (($('useTukarTambah').checked && tukarTambah) ? tukarTambah : null);
+  const ttKurangiTotal = !ttFromSplit;
+  const items = keranjang.map(k => ({ id: k.id, nama: k.nama, varian: k.varian, storage: k.storage, imei: k.imei, qty: k.qty, harga: k.harga }));
+  const kasir = currentUser.full_name || currentUser.username;
+  const btn = $('btnCheckout'); btn.disabled = true; btn.innerHTML = '<div class="spinner-white"></div>';
+  try {
+    const itemIds = [...new Set(items.map(i => i.id))];
+    const { data: prods, error: perr } = await supabase.from('produk').select('*').in('id', itemIds);
+    if (perr) throw perr;
+    const prodMap = {}; (prods || []).forEach(p => prodMap[p.id] = p);
+    for (const item of items) {
+      const prod = prodMap[item.id];
+      if (!prod) throw new Error('Produk tidak ditemukan di database.');
+      if (item.imei) {
+        const ok = (prod.imeis || []).some(im => im.imei === item.imei && im.status === 'tersedia');
+        if (!ok) throw new Error('IMEI ' + item.imei + ' tidak tersedia untuk ' + prod.nama);
+      } else if (Number(item.qty) > Number(prod.stok)) {
+        throw new Error('Stok "' + prod.nama + '" tidak cukup.');
+      }
+    }
+    let total = 0, hppTotal = 0;
+    const itemsArr = [], itemsJson = [];
+    items.forEach(item => {
+      const qty = Number(item.qty) || 0;
+      total += Number(item.harga) * qty;
+      const prod = prodMap[item.id];
+      const modalSatuan = prod.is_konsinyasi ? Number(prod.harga_setoran || 0) : Number(prod.harga_modal || 0);
+      hppTotal += modalSatuan * qty;
+      const storageTxt = item.storage ? ' (' + item.storage + ')' : '';
+      const imeiTxt = item.imei ? ' [IMEI:' + item.imei + ']' : '';
+      itemsArr.push(item.nama + ' ' + item.varian + storageTxt + imeiTxt + ' x' + item.qty);
+      itemsJson.push({ id: item.id, nama: item.nama, varian: item.varian || '', storage: item.storage || '', imei: item.imei || null, qty, harga: Number(item.harga) });
+    });
+    let diskonRp = 0;
+    if (String(diskonStr).indexOf('%') !== -1) diskonRp = (total * parseFloat(diskonStr)) / 100;
+    else diskonRp = parseFloat(diskonStr) || 0;
+    const nilaiTukar = Number(ttData ? ttData.nilai : 0) || 0;
+    let totalAkhir = total - diskonRp - (ttKurangiTotal ? nilaiTukar : 0);
+    if (totalAkhir < 0) totalAkhir = 0;
+    const tgl = new Date().toISOString();
+    const idTrx = 'INV' + tgl.replace(/[-:T]/g, '').split('.')[0] + Math.floor(Math.random() * 90 + 10);
+    let metodeBayarFinal = metode;
+    let rincianBayar = [{ metode, jumlah: totalAkhir }];
+    if (splits && splits.length > 1) {
+      metodeBayarFinal = splits.map(p => p.metode + ' (' + p.jumlah + ')').join(' + ');
+      rincianBayar = splits.map(p => ({ metode: p.metode, jumlah: Number(p.jumlah) || 0 }));
+    }
+    const { error: trxErr } = await supabase.from('transaksi').insert([{
+      id: idTrx, tgl, pelanggan: pelanggan || null, items: itemsArr.join(', '), items_json: itemsJson,
+      kasir, total: totalAkhir, hpp: hppTotal, metode: metodeBayarFinal, diskon: diskonStr,
+      rincian_bayar: rincianBayar,
+      tt_nama: ttData ? ttData.nama : null, tt_imei: ttData ? (ttData.imei || null) : null, tt_nilai: nilaiTukar
+    }]);
+    if (trxErr) throw new Error('Gagal simpan transaksi: ' + trxErr.message);
+    const updates = [];
+    const mitraHutangMap = {};
+    for (const item of items) {
+      const prod = prodMap[item.id];
+      if (item.imei) {
+        const newImeis = (prod.imeis || []).filter(im => im.imei !== item.imei);
+        updates.push(supabase.from('produk').update({ imeis: newImeis, stok: newImeis.length }).eq('id', item.id));
+      } else {
+        updates.push(supabase.from('produk').update({ stok: Number(prod.stok) - Number(item.qty) }).eq('id', item.id));
+      }
+      if (garansiBulan > 0) {
+        const warrantyId = 'GR' + Date.now() + Math.floor(Math.random() * 1000) + Math.floor(Math.random() * 1000);
+        const namaProduk = item.nama + ' ' + (item.varian || '') + (item.storage ? ' (' + item.storage + ')' : '');
+        updates.push(supabase.from('garansi').insert([{ id: warrantyId, no_invoice: idTrx, tgl, imei: item.imei || '-', nama_produk: namaProduk, pelanggan, telp: '', masa_garansi: garansiBulan }]));
+      }
+      if (prod.is_konsinyasi && prod.mitra_id) {
+        mitraHutangMap[prod.mitra_id] = (mitraHutangMap[prod.mitra_id] || 0) + Number(prod.harga_setoran || 0) * Number(item.qty);
+      }
+    }
+    for (const mitraId in mitraHutangMap) {
+      const tambahan = mitraHutangMap[mitraId];
+      updates.push((async () => {
+        const { data: m } = await supabase.from('mitra').select('hutang').eq('id', mitraId).maybeSingle();
+        if (m) await supabase.from('mitra').update({ hutang: Number(m.hutang) + tambahan }).eq('id', mitraId);
+      })());
+    }
+    await Promise.all(updates);
+    showStruk({
+      id: idTrx, tgl, pelanggan, kasir, metode, diskon: diskonStr,
+      ttNilai: ttKurangiTotal ? nilaiTukar : 0, ttNama: ttData ? ttData.nama : '',
+      items, total: totalAkhir, split: splits, diterima, kembalian, garansi: garansiBulan
+    });
+    keranjang = []; tukarTambah = null; splitPayments = [];
+    $('useTukarTambah').checked = false; $('useSplitPayment').checked = false;
+    $('splitPaymentArea').classList.add('hidden'); $('ttSummary').classList.add('hidden');
+    $('namaPelanggan').value = ''; $('diskonInput').value = '0'; $('diskonType').value = 'rp';
+    $('masaGaransi').value = '0'; $('metodeBayar').value = 'Cash'; $('namaCicilan').value = ''; toggleCicilanInput();
+    renderKeranjang(); loadProduk();
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; btn.textContent = 'Bayar [Enter]';
+}
   
 /* ================= INIT ================= */
 document.addEventListener('DOMContentLoaded', () => {
